@@ -42,7 +42,7 @@ selected purely on the highest in-sample return, in anticipation of the forward 
 
 \section{Data}
 
-\textbf{Universe.} The eligible universe (\textasciitilde 300 stocks) was built by combining the
+\textbf{Universe.} The eligible universe ($\approx$300 stocks) was built by combining the
 current NSE constituent lists for Nifty 100, Nifty Midcap 100 and Nifty Smallcap 100. A handful
 of symbols appear on more than one list; these are de-duplicated to a single entry recording
 every index the stock belongs to. Since point-in-time historical index membership is not freely
@@ -89,7 +89,7 @@ manages risk, since momentum alone is known to be prone to sharp reversals (a ``
 crash'') after a strong run. The quality/trend-smoothness factor was added for a specific,
 tested reason rather than assumed upfront: an earlier two-factor version of this strategy
 underperformed the benchmark in a blind 2025 test (Section 6), and the cause was concentration
-in momentum names with erratic rather than steady price paths -- exactly the names most prone to
+in momentum names with erratic rather than steady price paths--exactly the names most prone to
 reversal. Adding trend-quality was confirmed, not merely assumed, to fix that weakness (Section
 7). Value and fundamental-quality factors were excluded for the data-reliability reason above;
 size is already handled structurally by the universe spanning three cap segments; liquidity was
@@ -117,9 +117,9 @@ value of every executed buy and sell and is deducted directly from cash, so it c
 every subsequent decision rather than being a cosmetic adjustment at the end.
 
 \subsection{Consistency and parameter selection}
-The same formula, thresholds and rules are applied to every one of the \textasciitilde 300
+The same formula, thresholds and rules are applied to every one of the $\approx$300
 eligible stocks with no per-stock discretion. The one free parameter with any real tuning
-behind it -- the 50\% weight given to the quality factor -- was selected using only 2021--2024
+behind it--the 50\% weight given to the quality factor--was selected using only 2021--2024
 training data and full-backtest metrics, deliberately excluding the 2025 held-out test, via a
 0.001-resolution grid search. That search confirmed the chosen weight sits inside a genuine
 stable plateau (0.499--0.503, five consecutive 0.001-steps giving bit-identical results) rather
@@ -202,15 +202,15 @@ Rs 1 crore).}
 
 For additional context beyond the required list, the strategy also shows Beta $\approx 0.85$
 and annualised Alpha $\approx +33.6\%$ against Nifty 500, an Information Ratio of 2.45, a
-Sortino Ratio of 3.86, and a Calmar Ratio of 1.96 -- indicating the outperformance is not simply
+Sortino Ratio of 3.86, and a Calmar Ratio of 1.96--indicating the outperformance is not simply
 leveraged market exposure (beta is below 1), and that a large share of the return comes from
 stock selection rather than broad market movement ($R^2 \approx 0.49$).
 
 \section{Benchmark Comparison}
 
 \textbf{Benchmark choice.} Nifty 500 (index \texttt{\^{}CRSLDX}) is used as the primary
-benchmark because the eligible universe spans large, mid and small caps; a broad, \textasciitilde
-500-name, all-cap index is a more representative comparator than a large-cap-only index such as
+benchmark because the eligible universe spans large, mid and small caps; a broad, $\approx$500-name,
+all-cap index is a more representative comparator than a large-cap-only index such as
 Nifty 100. Nifty 100 is reported alongside for completeness, since the challenge permits either.
 
 \begin{table}[h]
@@ -230,8 +230,8 @@ Outperformance (CAGR, pp) & -- & +31.24 & +33.25 \\
 \end{table}
 
 The strategy outperforms both benchmarks by a wide margin on CAGR and total return, at the cost
-of a somewhat deeper maximum drawdown than Nifty 500 -- expected for a concentrated 10-stock
-book relative to a \textasciitilde 500-name index, and discussed further below.
+of a somewhat deeper maximum drawdown than Nifty 500--expected for a concentrated 10-stock
+book relative to a $\approx$500-name index, and discussed further below.
 
 \section{Limitations and Discussion}
 
@@ -253,7 +253,7 @@ it reduced every headline metric in the official 2021--2025 backtest at once (Ne
 Rs 5.76cr to Rs 4.19cr, CAGR from 46.6\% to 39.0\%, Sharpe from 2.66 to 2.46,
 Gain-to-Loss from 2.80 to 2.63), without even improving full-period maximum drawdown. Since
 Total Net PnL is the primary Round 2 ranking metric, this was a deliberate, metrics-driven
-decision to exclude it, not an oversight -- a real trade-off between smoother quarter-to-quarter
+decision to exclude it, not an oversight--a real trade-off between smoother quarter-to-quarter
 behaviour and the metric the round is actually scored on.
 
 \textbf{Execution friction.} Rebalance trades execute sequentially against a fixed cash pool
@@ -276,8 +276,8 @@ regime where price-momentum and fundamentals diverge sharply.
 
 \textbf{General caveat.} All of the above is based on a single historical path. The out-of-
 sample stress test (1 January--30 June 2026) is a genuine test of generalisation rather than a
-formality, and the validation discipline described in Section 3.4 -- locking parameters before
-looking at held-out performance -- was followed specifically because backtest performance,
+formality, and the validation discipline described in Section 3.4--locking parameters before
+looking at held-out performance--was followed specifically because backtest performance,
 however strong, is not a guarantee of future results.
 
 \end{document}
