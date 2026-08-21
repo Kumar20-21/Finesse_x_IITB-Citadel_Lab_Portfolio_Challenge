@@ -1,5 +1,7 @@
 # Finesse x Citadel Portfolio Challenge — Round 2
 
+**Team JP's Portfolio** — Keshav Kumar, Jyoti Pandey
+
 A systematic, rules-based 10-stock equity portfolio strategy over the Nifty 100 / Midcap 100 /
 Smallcap 100 universe, backtested 1 Jan 2021 – 31 Dec 2025. See `report/report.pdf` for the full
 5-6 page writeup (problem, methodology, results, benchmark comparison, limitations). This README
