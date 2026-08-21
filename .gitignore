@@ -5,3 +5,21 @@ __pycache__/
 *.log
 *.out
 *.toc
+
+# AI coding assistant artifacts (settings, session/cache state) - not part of the deliverable
+.claude/
+.claude.json
+CLAUDE.md
+.cursor/
+.cursorrules
+.cursorignore
+.windsurf/
+.windsurfrules
+.continue/
+.aider*
+.copilot/
+.github/copilot-instructions.md
+.codeium/
+.cody/
+.aim/
+.junie/
