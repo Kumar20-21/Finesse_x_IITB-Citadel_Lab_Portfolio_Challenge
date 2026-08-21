@@ -44,16 +44,21 @@ selected purely on the highest in-sample return, in anticipation of the forward 
 \section{Data}
 
 \textbf{Universe.} The eligible universe (\textasciitilde 300 stocks) was built by combining the
-current NSE constituent lists for Nifty 100, Nifty Midcap 100 and Nifty Smallcap 100. Since
-point-in-time historical index membership is not freely available, the current constituent
-lists are applied retroactively across the full 2021--2025 backtest; this is a stated
-simplification (see Limitations).
+current NSE constituent lists for Nifty 100, Nifty Midcap 100 and Nifty Smallcap 100. A handful
+of symbols appear on more than one list; these are de-duplicated to a single entry recording
+every index the stock belongs to. Since point-in-time historical index membership is not freely
+available, the current constituent lists are applied retroactively across the full 2021--2025
+backtest; this is a stated simplification (see Limitations).
 
 \textbf{Prices.} Daily OHLCV data for every universe stock, and for the two benchmark indices,
-was downloaded via the \texttt{yfinance} package, using auto-adjusted closes (dividend- and
-split-adjusted). Data was pulled from June 2019 onward, well before the 2021 backtest start, so
-that the 252-day momentum/quality lookback and the 200-day trend filter have sufficient history
-from day one of the backtest.
+was downloaded via the \texttt{yfinance} package (frequency: daily; period: June 2019 onward,
+well before the 2021 backtest start, through the end of the backtest), using auto-adjusted
+closes (dividend- and split-adjusted). Only the adjusted \emph{close} column feeds the model
+itself; open/high/low/volume are downloaded but not used by the current strategy. The extra
+pre-2021 history is a buffer so the 252-day momentum/quality lookback and the 200-day trend
+filter have sufficient data from day one of the backtest. At each quarterly rebalance, any stock
+with less than 95\% price coverage over the lookback window (mostly recent IPOs) is excluded
+from that quarter's ranking rather than treated as having a zero or missing score.
 
 \textbf{Fundamental data.} No fundamental data (earnings, book value, ROE, etc.) is used. This
 is a deliberate choice, not an oversight: reliable, point-in-time fundamental data free of
@@ -165,6 +170,30 @@ Total Transaction Costs Paid & Rs 9.43 lakh \\
 \caption{Required Round 2 metrics, full 2021--2025 backtest.}
 \end{table}
 
+\begin{table}[h]
+\centering
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Ticker} & \textbf{Company} & \textbf{Shares} & \textbf{Price (Rs)} & \textbf{Weight} \\
+\midrule
+BHARTIARTL & Bharti Airtel Ltd. & 5{,}028 & 2{,}079.43 & 15.46\% \\
+NAVINFLUOR & Navin Fluorine International Ltd. & 1{,}636 & 5{,}912.89 & 14.31\% \\
+EICHERMOT & Eicher Motors Ltd. & 1{,}334 & 7{,}236.72 & 14.28\% \\
+FORTIS & Fortis Healthcare Ltd. & 9{,}382 & 883.06 & 12.25\% \\
+LAURUSLABS & Laurus Labs Ltd. & 6{,}774 & 1{,}106.90 & 11.09\% \\
+MUTHOOTFIN & Muthoot Finance Ltd. & 1{,}867 & 3{,}779.74 & 10.44\% \\
+MANAPPURAM & Manappuram Finance Ltd. & 18{,}765 & 306.66 & 8.51\% \\
+ASTERDM & Aster DM Quality Care Ltd. & 8{,}011 & 614.16 & 7.28\% \\
+FORCEMOT & Force Motors Ltd. & 1 & 20{,}566.00 & 0.03\% \\
+\quad Cash & (uninvested, awaiting redeployment) & -- & -- & 6.37\% \\
+\bottomrule
+\end{tabular}
+\caption{Final portfolio composition and weights, as of 31 December 2025. Only 9 of the
+permitted 10 slots are filled: the 10th position went unfilled that quarter when sequential
+rebalance trades exhausted available cash before its turn (Section 7), leaving that slice as
+cash rather than a modelling error.}
+\end{table}
+
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.85\textwidth]{equity_curve.pdf}
@@ -193,7 +222,8 @@ Nifty 100. Nifty 100 is reported alongside for completeness, since the challenge
 \midrule
 CAGR & 46.60\% & 15.36\% & 13.35\% \\
 Total Return, 2021--2025 & 576.23\% & 104.17\% & 87.07\% \\
-Maximum Drawdown & $-$23.78\% & $-$18.84\% & -- \\
+Maximum Drawdown & $-$23.78\% & $-$18.84\% & $-$17.56\% \\
+Sharpe Ratio (rf = 0\%) & 2.66 & 1.07 & 0.94 \\
 Outperformance (CAGR, pp) & -- & +31.24 & +33.25 \\
 \bottomrule
 \end{tabular}
