@@ -30,15 +30,15 @@
 Each team constructs and manages a maximum 10-stock equity portfolio drawn from
 the Nifty 100, Nifty Midcap 100 and Nifty Smallcap 100 universes, backtested from 1 January 2021
 to 31 December 2025 with a virtual corpus of Rs 1 crore. The primary ranking metric is Total Net
-PnL, and a forward-looking out-of-sample stress test on 1 January to 30 June 2026 checks that the
+PnL, and a forward-looking out-of-sample stress test on 1 January 2026 to 30 June 2026 checks that the
 strategy generalises beyond the backtest window.
 
 The central idea is a single, fully systematic composite-factor strategy applied identically to
 every eligible stock: a quarterly-rebalanced ranking on three price-based factors (12-1 month
 momentum, low-volatility, and a trend-quality measure), sized by inverse volatility with a
 concentration cap. A daily 200-day moving-average trend filter overlays this quarterly cycle for
-additional risk management. The design was deliberately kept simple and fully rules-based, so
-another evaluator can trace exactly how the portfolio was produced at any point in time. It was
+additional risk management. The design was deliberately kept simple and fully rule-based.
+Therefore, it can be traced exactly how the portfolio was produced at any point in time. It was
 also validated using a train/test split and a rolling-window robustness check, rather than
 chosen purely for the highest in-sample return, in anticipation of the forward stress test.
 
@@ -281,7 +281,7 @@ valuation, earnings quality, or balance-sheet risk directly. It would not be exp
 well in a regime where price-momentum and fundamentals diverge sharply.
 
 \textbf{General caveat.} All of the above is based on a single historical path. The
-out-of-sample stress test (1 January to 30 June 2026) is a genuine test of generalisation rather
+out-of-sample stress test (1 January 2026 to 30 June 2026) is a genuine test of generalisation rather
 than a formality. The validation discipline described in Section 3.4--locking parameters before
 looking at held-out performance--was followed specifically because backtest performance, however
 strong, is not a guarantee of future results.
