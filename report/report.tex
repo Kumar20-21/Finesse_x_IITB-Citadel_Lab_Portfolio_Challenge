@@ -7,6 +7,7 @@
 \usepackage{titlesec}
 \usepackage{enumitem}
 \usepackage{parskip}
+\setlength{\parskip}{0.4em plus 0.1em minus 0.1em}
 \usepackage{xcolor}
 
 \titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
@@ -28,17 +29,18 @@
 
 Round 2 asks each team to construct and manage a maximum 10-stock equity portfolio drawn from
 the Nifty 100, Nifty Midcap 100 and Nifty Smallcap 100 universes, backtested from 1 January 2021
-to 31 December 2025 with a virtual corpus of Rs 1 crore, and evaluated primarily on
-Total Net PnL, with a forward-looking out-of-sample stress test on 1 January--30 June 2026.
+to 31 December 2025 with a virtual corpus of Rs 1 crore. The primary ranking metric is Total Net
+PnL, and a forward-looking out-of-sample stress test on 1 January--30 June 2026 checks that the
+strategy generalises beyond the backtest window.
 
-The central idea behind this submission is a single, fully systematic composite factor
-strategy applied identically to every eligible stock: a quarterly-rebalanced ranking on three
-price-based factors (12-1 month momentum, low-volatility, and a trend-quality measure), sized
-by inverse volatility with a concentration cap, overlaid with a daily 200-day moving-average
-trend filter for risk management. The design was deliberately kept simple and fully rules-based
-so that another evaluator can trace exactly how the portfolio was produced at any point in time,
-and it was validated using a train/test split and a rolling-window robustness check rather than
-selected purely on the highest in-sample return, in anticipation of the forward stress test.
+The central idea is a single, fully systematic composite-factor strategy applied identically to
+every eligible stock: a quarterly-rebalanced ranking on three price-based factors (12-1 month
+momentum, low-volatility, and a trend-quality measure), sized by inverse volatility with a
+concentration cap. A daily 200-day moving-average trend filter overlays this quarterly cycle for
+additional risk management. The design was deliberately kept simple and fully rules-based, so
+another evaluator can trace exactly how the portfolio was produced at any point in time. It was
+also validated using a train/test split and a rolling-window robustness check, rather than
+chosen purely for the highest in-sample return, in anticipation of the forward stress test.
 
 \section{Data}
 
@@ -49,11 +51,11 @@ every index the stock belongs to. Since point-in-time historical index membershi
 available, the current constituent lists are applied retroactively across the full 2021--2025
 backtest; this is a stated simplification (see Limitations).
 
-\textbf{Prices.} Daily OHLCV data for every universe stock, and for the two benchmark indices,
-was downloaded via the \texttt{yfinance} package (frequency: daily; period: June 2019 onward,
-well before the 2021 backtest start, through the end of the backtest), using auto-adjusted
-closes (dividend- and split-adjusted). Only the adjusted \emph{close} column feeds the model
-itself; open/high/low/volume are downloaded but not used by the current strategy. The extra
+\textbf{Prices.} Daily OHLCV data for every universe stock and for the two benchmark indices was
+downloaded via the \texttt{yfinance} package, covering June 2019 onward (well before the 2021
+backtest start) through the end of the backtest. Prices are auto-adjusted closes (dividend- and
+split-adjusted). Only the adjusted \emph{close} column feeds the model itself; open/high/low/volume
+are downloaded but not used by the current strategy. The extra
 pre-2021 history is a buffer so the 252-day momentum/quality lookback and the 200-day trend
 filter have sufficient data from day one of the backtest. At each quarterly rebalance, any stock
 with less than 95\% price coverage over the lookback window (mostly recent IPOs) is excluded
@@ -62,7 +64,7 @@ from that quarter's ranking rather than treated as having a zero or missing scor
 \textbf{Fundamental data.} No fundamental data (earnings, book value, ROE, etc.) is used. This
 is a deliberate choice, not an oversight: reliable, point-in-time fundamental data free of
 look-ahead bias is not readily available for 300 stocks spanning large, mid and small caps in
-India, and building the model on price data alone keeps the same formula applicable to every
+India. Building the model on price data alone also keeps the same formula applicable to every
 stock without exception.
 
 \section{Methodology}
@@ -73,48 +75,49 @@ eligible stock:
 \[
 \text{Composite} = 0.5\times\big[0.5\,Z(\text{Momentum}) + 0.5\,Z(\text{Low-Vol})\big] + 0.5\,Z(\text{Quality})
 \]
-where \textbf{Momentum} is 12-month price return skipping the most recent month (the standard
-``12-1'' construction, which avoids short-term reversal effects), \textbf{Low-Vol} is the
-negative of the trailing 90-day daily return standard deviation, and \textbf{Quality} is the
+Here, \textbf{Momentum} is the 12-month price return skipping the most recent month (the
+standard ``12-1'' construction, which avoids short-term reversal effects). \textbf{Low-Vol} is
+the negative of the trailing 90-day daily return standard deviation. \textbf{Quality} is the
 $R^2$ of a linear trend fit to log-price over the same 12-month window, which penalises spiky,
 parabolic price paths in favour of smoothly-trending ones. Each factor is cross-sectionally
-z-scored across all stocks with at least 95\% price history over the lookback window (stocks
-without enough history, mostly recent IPOs, are automatically excluded that quarter); the 10
-highest composite-score stocks are selected.
+z-scored across all stocks with at least 95\% price history over the lookback window; stocks
+without enough history (mostly recent IPOs) are automatically excluded that quarter. The 10
+highest composite-score stocks are then selected.
 
 \textbf{Why these three factors.} Momentum and low-volatility are two of the most extensively
-documented factors in equity research and are deliberately complementary rather than redundant:
-momentum drives the return by following stocks that are already trending, while low-volatility
-manages risk, since momentum alone is known to be prone to sharp reversals (a ``momentum
-crash'') after a strong run. The quality/trend-smoothness factor was added for a specific,
-tested reason rather than assumed upfront: an earlier two-factor version of this strategy
-underperformed the benchmark in a blind 2025 test (Section 6), and the cause was concentration
-in momentum names with erratic rather than steady price paths--exactly the names most prone to
-reversal. Adding trend-quality was confirmed, not merely assumed, to fix that weakness (Section
-7). Value and fundamental-quality factors were excluded for the data-reliability reason above;
-size is already handled structurally by the universe spanning three cap segments; liquidity was
-not added separately since it overlaps heavily with volatility; and a short-term reversal factor
-was rejected because it would work against momentum over a similar horizon.
+documented factors in equity research, and they are deliberately complementary rather than
+redundant. Momentum drives the return by following stocks that are already trending, while
+low-volatility manages risk, since momentum alone is known to be prone to sharp reversals (a
+``momentum crash'') after a strong run. The quality/trend-smoothness factor was added for a
+specific, tested reason rather than assumed upfront. An earlier two-factor version of this
+strategy underperformed the benchmark in a blind 2025 test (Section 7), and the cause was
+concentration in momentum names with erratic rather than steady price paths--exactly the names
+most prone to reversal. Adding trend-quality was confirmed, not merely assumed, to fix that
+weakness (Section 7). Value and fundamental-quality factors were excluded for the
+data-reliability reason above. Size is already handled structurally by the universe spanning
+three cap segments. Liquidity was not added separately since it overlaps heavily with
+volatility. And a short-term reversal factor was rejected because it would work against momentum
+over a similar horizon.
 
 \subsection{Weighting}
 Selected stocks are sized inverse to their own trailing 90-day volatility (the same volatility
 used in the Low-Vol factor), so that size is set by each stock's own risk rather than by how
 high it ranks on the noisier composite score. Raw inverse-volatility affinities are shifted down
 by their minimum (plus a small constant) before normalising, then capped at 15\% of portfolio
-value per name, with any excess above the cap redistributed proportionally among the remaining
-names (iterated until no name exceeds the cap). This keeps a single very low-volatility name
+value per name. Any excess above the cap is redistributed proportionally among the remaining
+names, iterated until no name exceeds the cap. This keeps a single very low-volatility name
 from dominating the book.
 
 \subsection{Rebalancing and risk management}
-Stock selection and target weights are decided quarterly; only the delta needed to reach the new
+Stock selection and target weights are decided quarterly. Only the delta needed to reach the new
 target is traded for names that remain selected, while dropped names are fully sold and new
 entrants are bought to target. Independent of this quarterly schedule, a 200-day moving-average
-trend filter is checked \emph{daily} on every held position: if a stock's close falls below its
+trend filter is checked \emph{daily} on every held position. If a stock's close falls below its
 own 200-day average, the position is fully exited to cash (a defensive rule, not a directional
-bet), and if price reclaims the average before the next rebalance, the position is re-bought
-using the cash reserved for that slot. A flat 0.1\% transaction cost is charged on the notional
-value of every executed buy and sell and is deducted directly from cash, so it compounds into
-every subsequent decision rather than being a cosmetic adjustment at the end.
+bet). If price reclaims the average before the next rebalance, the position is re-bought using
+the cash reserved for that slot. A flat 0.1\% transaction cost is charged on the notional value
+of every executed buy and sell, and is deducted directly from cash. This means it compounds into
+every subsequent decision rather than being a cosmetic adjustment applied at the end.
 
 \subsection{Consistency and parameter selection}
 The same formula, thresholds and rules are applied to every one of the $\approx$300
@@ -123,23 +126,25 @@ behind it--the 50\% weight given to the quality factor--was selected using only 
 training data and full-backtest metrics, deliberately excluding the 2025 held-out test, via a
 0.001-resolution grid search. That search confirmed the chosen weight sits inside a genuine
 stable plateau (0.499--0.503, five consecutive 0.001-steps giving bit-identical results) rather
-than an isolated, fragile spike, which is important given how easy it is to overfit a single
+than an isolated, fragile spike. This distinction matters because it is easy to overfit a single
 free parameter to one backtest window.
 
 \subsection{Key assumptions}
-Trades execute at the same-day closing price as the signal date (standard close-to-close
-convention); all trades are in whole shares (no fractional shares), with target rupee
-allocations floored to the nearest full share; idle or exited cash earns 0\%; corporate actions
-are handled via Yahoo Finance's auto-adjusted close series; and no slippage, shorting or
-leverage is modelled beyond the stated 0.1\% transaction cost.
+\begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=0.2em]
+\item Trades execute at the same-day closing price as the signal date (standard close-to-close convention).
+\item All trades are in whole shares (no fractional shares), with target rupee allocations floored to the nearest full share.
+\item Idle or exited cash earns 0\%.
+\item Corporate actions are handled via Yahoo Finance's auto-adjusted close series.
+\item No slippage, shorting or leverage is modelled beyond the stated 0.1\% transaction cost.
+\end{itemize}
 
 \section{Tools and Software Used}
 The entire pipeline is written in Python 3, using \texttt{pandas} and \texttt{numpy} for data
 handling and the day-by-day backtest simulation, and \texttt{yfinance} for price data
 acquisition. No machine-learning or numerical-optimisation library is used: the model is a
-transparent, rules-based factor score rather than a fitted or black-box model, which was a
-deliberate choice given the requirement that another evaluator be able to understand how the
-portfolio was produced. \texttt{matplotlib} was used for the chart in this report, and the
+transparent, rules-based factor score rather than a fitted or black-box one. This was a
+deliberate choice, given the requirement that another evaluator be able to understand exactly
+how the portfolio was produced. \texttt{matplotlib} was used for the chart in this report, and the
 report itself is typeset in \LaTeX{}. The complete code is in the accompanying GitHub
 repository (see the README for how to reproduce every number in this report).
 
@@ -202,16 +207,17 @@ Rs 1 crore).}
 
 For additional context beyond the required list, the strategy also shows Beta $\approx 0.85$
 and annualised Alpha $\approx +33.6\%$ against Nifty 500, an Information Ratio of 2.45, a
-Sortino Ratio of 3.86, and a Calmar Ratio of 1.96--indicating the outperformance is not simply
-leveraged market exposure (beta is below 1), and that a large share of the return comes from
-stock selection rather than broad market movement ($R^2 \approx 0.49$).
+Sortino Ratio of 3.86, and a Calmar Ratio of 1.96. Beta below 1 shows the outperformance is not
+simply leveraged market exposure, and $R^2 \approx 0.49$ shows that a large share of the return
+comes from stock selection rather than broad market movement.
 
 \section{Benchmark Comparison}
 
 \textbf{Benchmark choice.} Nifty 500 (index \texttt{\^{}CRSLDX}) is used as the primary
-benchmark because the eligible universe spans large, mid and small caps; a broad, $\approx$500-name,
-all-cap index is a more representative comparator than a large-cap-only index such as
-Nifty 100. Nifty 100 is reported alongside for completeness, since the challenge permits either.
+benchmark because the eligible universe spans large, mid and small caps. A broad,
+$\approx$500-name, all-cap index is a more representative comparator than a large-cap-only index
+such as Nifty 100. Nifty 100 is reported alongside for completeness, since the challenge permits
+either.
 
 \begin{table}[h]
 \centering
@@ -239,45 +245,45 @@ book relative to a $\approx$500-name index, and discussed further below.
 is structurally more exposed to leadership-rotation risk than a broad index. This is not
 theoretical: when the quality factor was withheld and the strategy re-run as a blind,
 walk-forward test (rules locked on 2021--2024, evaluated unmodified on 2025 alone), the
-two-factor version returned $-6.4\%$ to $-11.1\%$ in 2025 while Nifty 500 returned $+4.6\%$ and
-Nifty 100 $+6.6\%$; only the final three-factor design was profitable and beat both benchmarks
+two-factor version returned $-6.4\%$ to $-11.1\%$ in 2025, while Nifty 500 returned $+4.6\%$ and
+Nifty 100 $+6.6\%$. Only the final three-factor design was profitable and beat both benchmarks
 in that same blind test ($+7.9\%$). This is encouraging evidence the fix works, but it is a
 single held-out year and does not guarantee the strategy is immune to a different kind of
 reversal in the future.
 
 \textbf{A tested and rejected risk control.} A portfolio-level drawdown circuit breaker
 (de-risking 50\% of the book whenever it fell more than 8\% from its post-rebalance peak) was
-tested against a 20-quarter rolling grid. It improved the quarterly hit-rate against the
-benchmark from 90\% to 85\% and shrank the worst single quarter from $-16.2\%$ to $-14.5\%$, but
-it reduced every headline metric in the official 2021--2025 backtest at once (Net PnL from
+tested against a 20-quarter rolling grid. It shrank the worst single quarter from $-16.2\%$ to
+$-14.5\%$, but it also reduced the quarterly hit-rate against the benchmark from 90\% to 85\%
+and cut every other headline metric in the official 2021--2025 backtest at once (Net PnL from
 Rs 5.76cr to Rs 4.19cr, CAGR from 46.6\% to 39.0\%, Sharpe from 2.66 to 2.46,
 Gain-to-Loss from 2.80 to 2.63), without even improving full-period maximum drawdown. Since
 Total Net PnL is the primary Round 2 ranking metric, this was a deliberate, metrics-driven
-decision to exclude it, not an oversight--a real trade-off between smoother quarter-to-quarter
-behaviour and the metric the round is actually scored on.
+decision to exclude the breaker, not an oversight. It reflects a real trade-off between smoother
+quarter-to-quarter behaviour and the metric the round is actually scored on.
 
 \textbf{Execution friction.} Rebalance trades execute sequentially against a fixed cash pool
-each quarter. Because target rupee amounts are floored to whole shares, it is possible (and was
-observed at least once in the backtest) for a lower-priority target position to go temporarily
-unfunded if earlier trades in the same rebalance exhaust available cash, leaving that capital in
-cash until the next rebalance rather than fully deployed. This is a realistic execution
-constraint rather than a modelling error, but it means realised weights can occasionally differ
-slightly from target weights.
+each quarter. Because target rupee amounts are floored to whole shares, a lower-priority target
+position can go temporarily unfunded if earlier trades in the same rebalance exhaust available
+cash--this was observed at least once in the backtest. The unfunded capital sits in cash until
+the next rebalance rather than being fully deployed. This is a realistic execution constraint
+rather than a modelling error, but it means realised weights can occasionally differ slightly
+from target weights.
 
 \textbf{Universe timing.} Using current (rather than historical, point-in-time) index
 constituent lists for the full 2021--2025 backtest is a simplification driven by data
 availability; a small number of names in the backtest may not have been constituents of their
 respective index for the entire period.
 
-\textbf{No fundamental data.} The strategy is intentionally price-only. This avoids a real data-
-reliability problem for small and mid caps, but it also means the model cannot see valuation,
-earnings quality, or balance-sheet risk directly, and would not be expected to perform well in a
-regime where price-momentum and fundamentals diverge sharply.
+\textbf{No fundamental data.} The strategy is intentionally price-only. This avoids a real
+data-reliability problem for small and mid caps, but it also means the model cannot see
+valuation, earnings quality, or balance-sheet risk directly. It would not be expected to perform
+well in a regime where price-momentum and fundamentals diverge sharply.
 
-\textbf{General caveat.} All of the above is based on a single historical path. The out-of-
-sample stress test (1 January--30 June 2026) is a genuine test of generalisation rather than a
-formality, and the validation discipline described in Section 3.4--locking parameters before
-looking at held-out performance--was followed specifically because backtest performance,
-however strong, is not a guarantee of future results.
+\textbf{General caveat.} All of the above is based on a single historical path. The
+out-of-sample stress test (1 January--30 June 2026) is a genuine test of generalisation rather
+than a formality. The validation discipline described in Section 3.4--locking parameters before
+looking at held-out performance--was followed specifically because backtest performance, however
+strong, is not a guarantee of future results.
 
 \end{document}
