@@ -25,6 +25,7 @@ src/
   backtest_engine.py     Core engine: scoring, selection, weighting, rebalancing, trend filter
   run_backtest.py        Run the official submitted strategy, 2021-2025
   evaluate.py            Compute all required metrics + benchmark comparison
+  plot_results.py        Generate every report figure (equity curve, drawdown, quarterly excess)
 
 validation/
   train_test_validation.py    Lock rules on 2021-2024, test blind on 2025 (no re-tuning)
@@ -62,6 +63,7 @@ python3 src/build_universe.py     # -> data/universe.csv
 python3 src/download_data.py      # -> data/prices_close.pkl, prices_volume.pkl, benchmark.pkl
 python3 src/run_backtest.py       # -> results/equity_curve.pkl, trade_log.pkl, closed_trades.pkl
 python3 src/evaluate.py           # prints all required metrics + benchmark comparison
+python3 src/plot_results.py       # -> report/equity_curve.pdf, drawdown.pdf, quarterly_excess.pdf
 ```
 
 Note: re-running `download_data.py` pulls current data from Yahoo Finance, which can differ

@@ -205,6 +205,14 @@ cash rather than a modelling error.}
 Rs 1 crore).}
 \end{figure}
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\textwidth]{drawdown.pdf}
+\caption{Drawdown from running peak, strategy vs. Nifty 500, 2021--2025. The strategy's deeper
+trough in early 2025 is the $-23.78\%$ Maximum Drawdown reported in Table 1; it recovers to a
+new high within the same year.}
+\end{figure}
+
 For additional context beyond the required list, the strategy also shows Beta $\approx 0.85$
 and annualised Alpha $\approx +33.6\%$ against Nifty 500, an Information Ratio of 2.45, a
 Sortino Ratio of 3.86, and a Calmar Ratio of 1.96. Beta below 1 shows the outperformance is not
@@ -261,6 +269,15 @@ Gain-to-Loss from 2.80 to 2.63), without even improving full-period maximum draw
 Total Net PnL is the primary Round 2 ranking metric, this was a deliberate, metrics-driven
 decision to exclude the breaker, not an oversight. It reflects a real trade-off between smoother
 quarter-to-quarter behaviour and the metric the round is actually scored on.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\textwidth]{quarterly_excess.pdf}
+\caption{Excess return over Nifty 500 in each of the 20 independent calendar-quarter backtests
+used for the robustness grid above (the submitted, breaker-free strategy). 18 of 20 quarters
+(90\%) beat the benchmark; the two losing quarters, 2021Q1 and 2025Q1, are visible as the only
+bars below zero.}
+\end{figure}
 
 \textbf{Execution friction.} Rebalance trades execute sequentially against a fixed cash pool
 each quarter. Because target rupee amounts are floored to whole shares, a lower-priority target
