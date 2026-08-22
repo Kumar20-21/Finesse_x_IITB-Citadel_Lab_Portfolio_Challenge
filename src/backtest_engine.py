@@ -228,20 +228,28 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                     continue
                 execute(t, date, 'SELL', shares[t], p)
 
+            # Sells before buys: trim over-target positions first so their freed cash is
+            # available to fund under-target positions in the same rebalance, regardless of
+            # scan order. Without this, a lower-priority buy can be starved of cash that a
+            # later-in-list sell would otherwise have released.
+            diffs = {}
             for t in target_list:
                 p = px_today.get(t, np.nan)
                 if pd.isna(p) or p <= 0:
                     continue
-                cur_val = shares[t] * p
-                diff_val = target_alloc[t] - cur_val
+                diffs[t] = (target_alloc[t] - shares[t] * p, p)
+
+            for t, (diff_val, p) in diffs.items():
+                if diff_val < 0:
+                    n = np.floor(min(shares[t], -diff_val / p))
+                    if n >= 1:
+                        execute(t, date, 'SELL', n, p)
+
+            for t, (diff_val, p) in diffs.items():
                 if diff_val > 0:
                     n = np.floor(diff_val / p)
                     if n >= 1 and n * p <= cash:
                         execute(t, date, 'BUY', n, p)
-                elif diff_val < 0:
-                    n = np.floor(min(shares[t], -diff_val / p))
-                    if n >= 1:
-                        execute(t, date, 'SELL', n, p)
 
             quarter_peak = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
             breaker_triggered = False
