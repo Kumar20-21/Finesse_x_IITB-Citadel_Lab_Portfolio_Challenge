@@ -141,7 +141,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                   dd_breaker=None, dd_breaker_frac=0.5, mom_ensemble=False,
                   sector_cap=None, industry_map=None, quality_weight=0.0,
                   downside_vol=False, regime_bench=None, regime_defensive_frac=0.5,
-                  volume=None, min_adv_pctile=None):
+                  volume=None, min_adv_pctile=None, invvol_eps=0.1):
     """
     weighting: "equal" | "score" | "invvol"
     reentry: allow mid-quarter re-entry once price reclaims its 200-DMA
@@ -230,7 +230,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                 w = capped_weights(scores.loc[target_list], cap=weight_cap)
             elif weighting == "invvol":
                 inv = 1.0 / vol.loc[target_list]
-                w = capped_weights(inv, cap=weight_cap)
+                w = capped_weights(inv, cap=weight_cap, eps=invvol_eps)
             else:
                 raise ValueError(weighting)
 
