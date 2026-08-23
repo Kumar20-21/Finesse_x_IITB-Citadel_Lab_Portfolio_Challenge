@@ -141,7 +141,8 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                   dd_breaker=None, dd_breaker_frac=0.5, mom_ensemble=False,
                   sector_cap=None, industry_map=None, quality_weight=0.0,
                   downside_vol=False, regime_bench=None, regime_defensive_frac=0.5,
-                  volume=None, min_adv_pctile=None, invvol_eps=0.1, cash_buffer=0.0):
+                  volume=None, min_adv_pctile=None, invvol_eps=0.1, cash_buffer=0.0,
+                  redeploy_leftover=False):
     """
     weighting: "equal" | "score" | "invvol"
     reentry: allow mid-quarter re-entry once price reclaims its 200-DMA
@@ -162,6 +163,11 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
       (target weights are scaled by (1 - cash_buffer) before being converted to rupee
       allocations), so funding all N_HOLDINGS positions never structurally exceeds available
       cash once the 0.1% transaction cost on each buy is accounted for.
+    redeploy_leftover: if True, any cash left over after the main buy pass (e.g. because a
+      lower-priority name went unfunded) is topped up into the names that WERE funded that
+      quarter, proportional to their own target weights -- i.e. a more concentrated bet on the
+      names already selected, rather than forcing money into the unfunded name or leaving it
+      idle as cash.
     """
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
@@ -274,6 +280,38 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                     n = np.floor(diff_val / p)
                     if n >= 1 and n * p <= cash:
                         execute(t, date, 'BUY', n, p)
+
+            if redeploy_leftover:
+                # Top up the names that DID get funded, proportional to their own target
+                # weights, using whatever cash is left after the main pass -- a more
+                # concentrated bet on the already-selected names, instead of leaving the
+                # shortfall idle or forcing it into the unfunded (typically riskiest) name.
+                # The 15% cap (Section 3.2) is re-enforced here too: only headroom below the
+                # cap is used, iterating so cash freed by capped-out names reaches the rest.
+                for _ in range(5):
+                    funded = [t for t in target_list if shares.get(t, 0) > 0]
+                    if not funded or cash <= 0:
+                        break
+                    port_val_now = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
+                    cur_val = pd.Series({t: shares[t] * px_today.get(t, np.nan) for t in funded})
+                    headroom = (weight_cap * port_val_now - cur_val).clip(lower=0)
+                    headroom = headroom[headroom > 0]
+                    if headroom.empty:
+                        break
+                    w_room = w.loc[headroom.index]
+                    w_room = w_room / w_room.sum()
+                    bought_any = False
+                    for t in headroom.index:
+                        p = px_today.get(t, np.nan)
+                        if pd.isna(p) or p <= 0:
+                            continue
+                        extra_cash = min(w_room[t] * cash, headroom[t])
+                        n = np.floor(extra_cash / p)
+                        if n >= 1 and n * p <= cash:
+                            execute(t, date, 'BUY', n, p)
+                            bought_any = True
+                    if not bought_any:
+                        break
 
             quarter_peak = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
             breaker_triggered = False
