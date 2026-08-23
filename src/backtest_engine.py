@@ -142,7 +142,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                   sector_cap=None, industry_map=None, quality_weight=0.0,
                   downside_vol=False, regime_bench=None, regime_defensive_frac=0.5,
                   volume=None, min_adv_pctile=None, invvol_eps=0.1, cash_buffer=0.0,
-                  redeploy_leftover=False, redeploy_cap=None):
+                  redeploy_leftover=False, redeploy_cap=None, n_holdings=N_HOLDINGS):
     """
     weighting: "equal" | "score" | "invvol"
     reentry: allow mid-quarter re-entry once price reclaims its 200-DMA
@@ -174,6 +174,8 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
       names get selected and how the fund is initially sized, not how leftover cash from an
       already-capped selection is used. Pass a number (e.g. weight_cap) to re-enforce a cap on
       the redeployment pass too.
+    n_holdings: number of names selected each quarter (default N_HOLDINGS=10, the submitted
+      strategy's basket size).
     """
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
@@ -234,14 +236,14 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
             scores, vol = composite_scores(close, date, mom_weight, mom_ensemble=mom_ensemble,
                                             quality_weight=quality_weight, downside_vol=downside_vol,
                                             volume=volume, min_adv_pctile=min_adv_pctile)
-            target_list = select_top_n_with_sector_cap(scores, industry_map or {}, N_HOLDINGS, sector_cap=sector_cap)
+            target_list = select_top_n_with_sector_cap(scores, industry_map or {}, n_holdings, sector_cap=sector_cap)
             current_target_list = set(target_list)
             exited_pending_reentry = set()
 
             port_val = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
 
             if weighting == "equal":
-                w = pd.Series(1.0 / N_HOLDINGS, index=target_list)
+                w = pd.Series(1.0 / n_holdings, index=target_list)
             elif weighting == "score":
                 w = capped_weights(scores.loc[target_list], cap=weight_cap)
             elif weighting == "invvol":
