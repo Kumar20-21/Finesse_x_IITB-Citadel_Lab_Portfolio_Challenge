@@ -23,7 +23,8 @@ sys.path.insert(0, "src")
 from backtest_engine import run_backtest  # noqa: E402
 
 INITIAL_CAPITAL = 1_00_00_000
-FINAL_CONFIG = dict(mom_weight=0.5, weighting="invvol", weight_cap=0.15, reentry=True, quality_weight=0.5)
+FINAL_CONFIG = dict(mom_weight=0.5, weighting="invvol", weight_cap=0.15, reentry=True, quality_weight=0.5,
+                     redeploy_leftover=True)
 
 
 def plot_equity_curve(eq, bench):

@@ -21,9 +21,10 @@ CANDIDATES = {
     "Momentum-tilted": dict(mom_weight=0.6, weighting="score", weight_cap=0.20, reentry=True),
     "Risk-weighted": dict(mom_weight=0.5, weighting="invvol", weight_cap=0.15, reentry=True),
     "Final (submitted)": dict(mom_weight=0.5, weighting="invvol", weight_cap=0.15, reentry=True,
-                               quality_weight=0.5),
+                               quality_weight=0.5, redeploy_leftover=True),
     "Final + breaker (rejected)": dict(mom_weight=0.5, weighting="invvol", weight_cap=0.15, reentry=True,
-                                        quality_weight=0.5, dd_breaker=0.08, dd_breaker_frac=0.5),
+                                        quality_weight=0.5, redeploy_leftover=True,
+                                        dd_breaker=0.08, dd_breaker_frac=0.5),
 }
 INITIAL_CAPITAL = 1_00_00_000
 

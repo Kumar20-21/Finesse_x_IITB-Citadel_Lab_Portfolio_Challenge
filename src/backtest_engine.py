@@ -283,11 +283,19 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                     if n >= 1:
                         execute(t, date, 'SELL', n, p)
 
+            # Buys (main pass and, if enabled, the leftover-cash redeployment top-up) are
+            # accumulated per name against a simulated cash/share balance and executed as a
+            # single consolidated order per name at the end -- a real manager decides the final
+            # share count once and trades once, rather than placing a separate order for every
+            # intermediate step of arriving at that number.
+            buy_shares = {}
+            sim_cash = cash
             for t, (diff_val, p) in diffs.items():
                 if diff_val > 0:
                     n = np.floor(diff_val / p)
-                    if n >= 1 and n * p <= cash:
-                        execute(t, date, 'BUY', n, p)
+                    if n >= 1 and n * p * (1 + TXN_COST) <= sim_cash:
+                        buy_shares[t] = buy_shares.get(t, 0) + n
+                        sim_cash -= n * p * (1 + TXN_COST)
 
             if redeploy_leftover:
                 # Top up the names that DID get funded, proportional to their own target
@@ -296,13 +304,15 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                 # shortfall idle or forcing it into the unfunded (typically riskiest) name.
                 # weight_cap governed the initial selection/sizing pass above; redeploy_cap
                 # (None by default) separately controls whether this top-up pass is capped.
+                sim_shares = {t: shares.get(t, 0) + buy_shares.get(t, 0) for t in target_list
+                              if shares.get(t, 0) > 0 or buy_shares.get(t, 0) > 0}
                 for _ in range(5):
-                    funded = [t for t in target_list if shares.get(t, 0) > 0]
-                    if not funded or cash <= 0:
+                    funded = [t for t, s in sim_shares.items() if s > 0]
+                    if not funded or sim_cash <= 0:
                         break
                     if redeploy_cap is not None:
-                        port_val_now = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
-                        cur_val = pd.Series({t: shares[t] * px_today.get(t, np.nan) for t in funded})
+                        port_val_now = sim_cash + sum(sim_shares[t] * px_today.get(t, np.nan) for t in funded)
+                        cur_val = pd.Series({t: sim_shares[t] * px_today.get(t, np.nan) for t in funded})
                         headroom = (redeploy_cap * port_val_now - cur_val).clip(lower=0)
                         headroom = headroom[headroom > 0]
                         if headroom.empty:
@@ -318,15 +328,23 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                         p = px_today.get(t, np.nan)
                         if pd.isna(p) or p <= 0:
                             continue
-                        extra_cash = w_room[t] * cash
+                        extra_cash = w_room[t] * sim_cash
                         if headroom is not None:
                             extra_cash = min(extra_cash, headroom[t])
                         n = np.floor(extra_cash / p)
-                        if n >= 1 and n * p <= cash:
-                            execute(t, date, 'BUY', n, p)
+                        if n >= 1 and n * p * (1 + TXN_COST) <= sim_cash:
+                            buy_shares[t] = buy_shares.get(t, 0) + n
+                            sim_shares[t] += n
+                            sim_cash -= n * p * (1 + TXN_COST)
                             bought_any = True
                     if not bought_any:
                         break
+
+            for t, n in buy_shares.items():
+                if n >= 1:
+                    p = px_today.get(t, np.nan)
+                    if pd.notna(p) and p > 0 and n * p <= cash:
+                        execute(t, date, 'BUY', n, p)
 
             quarter_peak = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
             breaker_triggered = False

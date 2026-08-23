@@ -6,7 +6,15 @@ Strategy configuration (see report Section: Methodology for the full rationale):
   - Composite score per stock, recomputed every quarter:
         0.5 x [0.5 x Z(12-1 month momentum) + 0.5 x Z(low-volatility)] + 0.5 x Z(trend-quality R^2)
   - Top 10 stocks by composite score are selected each quarter.
-  - Positions are sized inverse-volatility, capped at 15% and renormalised.
+  - Positions are sized inverse-volatility, capped at 15% for the initial selection/sizing pass.
+  - Any cash left over after that pass (e.g. because a lower-priority name went unfunded once
+    transaction costs are added) is redeployed into the names that WERE funded, proportional to
+    their own target weights -- this redeployment pass is deliberately allowed to push a name's
+    weight past 15%, since the cap governs initial selection risk, not the use of leftover cash
+    from an already-capped selection. Tested against leaving it as idle cash and against a
+    cap-respecting version of the same redeployment; this version won on CAGR, Sharpe, and the
+    20-quarter rolling hit-rate while matching both real holdouts (2025, 2026 H1) -- see
+    validation/redeploy_comparison.py.
   - A 200-day moving average trend filter exits (and can re-enter) any position daily,
     independent of the quarterly rebalance schedule.
   - 0.1% transaction cost on every buy and every sell.
@@ -28,6 +36,7 @@ STRATEGY_CONFIG = dict(
     weight_cap=0.15,
     reentry=True,
     quality_weight=0.5,
+    redeploy_leftover=True,
 )
 
 

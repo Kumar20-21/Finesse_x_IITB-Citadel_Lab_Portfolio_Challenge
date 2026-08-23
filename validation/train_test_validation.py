@@ -18,7 +18,7 @@ CANDIDATES = {
     "Momentum-tilted": dict(mom_weight=0.6, weighting="score", weight_cap=0.20, reentry=True),
     "Risk-weighted": dict(mom_weight=0.5, weighting="invvol", weight_cap=0.15, reentry=True),
     "Final (submitted)": dict(mom_weight=0.5, weighting="invvol", weight_cap=0.15, reentry=True,
-                               quality_weight=0.5),
+                               quality_weight=0.5, redeploy_leftover=True),
 }
 
 

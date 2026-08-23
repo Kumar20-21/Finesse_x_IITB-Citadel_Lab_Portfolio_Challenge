@@ -12,9 +12,13 @@ covers only how to reproduce the code.
 Every quarter, a composite score combining three price-based factors — 12-1 month momentum,
 low-volatility, and a trend-quality factor (R² of the price trend) — is computed for all ~300
 eligible stocks. The 10 highest-scoring stocks are selected and sized inverse-volatility, capped
-at 15% per name. Between rebalances, a 200-day moving average trend filter can exit (and
-re-enter) any individual position on any trading day. A 0.1% transaction cost applies to every
-buy and sell. Full rationale for each design choice is in `report/report.pdf`.
+at 15% per name for this initial selection pass; any leftover cash (typically because the
+lowest-priority name is structurally underfunded once transaction costs are added) is redeployed
+into the names that were funded, which can push a name above 15%. Between rebalances, a 200-day
+moving average trend filter can exit (and re-enter) any individual position on any trading day. A
+0.1% transaction cost applies to every buy and sell. Full rationale for each design choice,
+including three tested-and-rejected alternatives to the redeployment rule, is in
+`report/report.pdf`.
 
 ## Repository structure
 
@@ -78,13 +82,22 @@ python3 validation/train_test_validation.py
 python3 validation/quarterly_robustness.py
 python3 validation/quality_weight_search.py
 python3 validation/liquidity_filter_search.py
+python3 validation/invvol_eps_search.py
+python3 validation/cash_buffer_search.py
+python3 validation/n_holdings_search.py
+python3 validation/weight_cap_search.py
+python3 validation/redeploy_comparison.py
 ```
 
 These reproduce the evidence discussed in the report's Methodology and Limitations sections:
 the train/2021-24-test/2025 split, the 20-quarter robustness grid (including why a tested
 drawdown-breaker variant was rejected), the parameter search confirming the quality-factor
-weight is a stable choice rather than an overfit one, and the liquidity-screen test (also
-tested and rejected -- see script docstring for why).
+weight is a stable choice rather than an overfit one, and several tested-and-rejected
+alternatives to the submitted design (a liquidity/ADV screen, a larger inverse-vol shift
+constant, a deliberate cash buffer, fewer than 10 holdings, and a looser concentration cap) --
+each script's docstring explains what was tested and why it didn't make the cut. The one
+alternative that DID make the cut, redeploying leftover cash into already-selected names, is
+compared against the two alternatives it beat in `redeploy_comparison.py`.
 
 ## Data sources
 
@@ -98,12 +111,12 @@ tested and rejected -- see script docstring for why).
 
 | Metric | Value |
 |---|---|
-| Total Net PnL | Rs 5.76 crore |
-| Annualised Return (CAGR) | 46.60% |
-| Maximum Drawdown | -23.78% |
-| Sharpe Ratio (rf=0%) | 2.66 |
-| Gain-to-Loss Ratio | 2.80 |
-| Accuracy | 52.59% |
+| Total Net PnL | Rs 7.01 crore |
+| Annualised Return (CAGR) | 51.66% |
+| Maximum Drawdown | -25.86% |
+| Sharpe Ratio (rf=0%) | 2.70 |
+| Gain-to-Loss Ratio | 2.39 |
+| Accuracy | 53.17% |
 | Benchmark (Nifty 500) CAGR | 15.36% |
 
 Full metric list, methodology, and discussion of limitations are in `report/report.pdf`.

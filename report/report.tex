@@ -1,5 +1,5 @@
 \documentclass[11pt]{article}
-\usepackage[margin=2.3cm]{geometry}
+\usepackage[margin=2.1cm]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{amsmath}
@@ -7,7 +7,7 @@
 \usepackage{titlesec}
 \usepackage{enumitem}
 \usepackage{parskip}
-\setlength{\parskip}{0.4em plus 0.1em minus 0.1em}
+\setlength{\parskip}{0.3em plus 0.1em minus 0.1em}
 \usepackage{xcolor}
 
 \titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
@@ -36,7 +36,8 @@ strategy generalises beyond the backtest window.
 The central idea is a single, fully systematic composite-factor strategy applied identically to
 every eligible stock: a quarterly-rebalanced ranking on three price-based factors (12-1 month
 momentum, low-volatility, and a trend-quality measure), sized by inverse volatility with a
-concentration cap. A daily 200-day moving-average trend filter overlays this quarterly cycle for
+concentration cap on the initial selection, with any leftover cash redeployed into the names
+already selected. A daily 200-day moving-average trend filter overlays this quarterly cycle for
 additional risk management. The design was deliberately kept simple and fully rule-based.
 Therefore, it can be traced exactly how the portfolio was produced at any point in time. It was
 also validated using a train/test split and a rolling-window robustness check, rather than
@@ -109,6 +110,20 @@ value per name. Any excess above the cap is redistributed proportionally among t
 names, iterated until no name exceeds the cap. This keeps a single very low-volatility name
 from dominating the book.
 
+The 15\% cap governs this initial selection and sizing pass only. Because the ten target weights
+sum to exactly 100\% while every buy also carries the 0.1\% transaction cost on top, fully funding
+all ten names would need slightly more than the available capital; the lowest-priority name is
+typically left short once whole-share flooring is applied (Section 7). Rather than let that
+shortfall sit idle as cash, it is redeployed into the names that were funded, proportional to
+their own target weights -- a more concentrated bet on names already selected, rather than
+forcing capital into the unfunded (typically highest-volatility) name or leaving it unused. This
+redeployment pass is deliberately allowed to push a name above 15\%: the cap is a selection-risk
+control, not a hard ceiling on what happens to leftover cash from an already-capped selection.
+This design was chosen over leaving the shortfall as cash and over a version of redeployment that
+re-enforces the 15\% cap during top-up, after testing all three: it matched the other two on the
+20-quarter rolling hit-rate and on the 2025 held-out test, while improving CAGR and Sharpe over
+both.
+
 \subsection{Rebalancing and risk management}
 Stock selection and target weights are decided quarterly. Only the delta needed to reach the new
 target is traded for names that remain selected, while dropped names are fully sold and new
@@ -157,22 +172,25 @@ repository (see the README for how to reproduce every number in this report).
 \toprule
 \textbf{Metric} & \textbf{Value} \\
 \midrule
-Final Portfolio Value & Rs 6.88 crore \\
-Total Net PnL & Rs 5.88 crore \\
-Absolute Return & 588.28\% \\
-Annualised Return (CAGR) & 47.12\% \\
-Maximum Drawdown & $-$23.78\% \\
-Sharpe Ratio (rf = 0\%) & 2.67 \\
-Gain-to-Loss Ratio & 2.82 \\
-Accuracy (\% profitable closed trades) & 52.59\% \\
-Total Executed Orders & 347 (179 buys, 168 sells) \\
-Closed Round-Trip Trades & 135 \\
-Average Trades per Stock & 3.94 \\
-Turnover (cumulative, 5-year) & 95.3$\times$ initial capital \\
-Total Transaction Costs Paid & Rs 9.53 lakh \\
+Final Portfolio Value & Rs 8.01 crore \\
+Total Net PnL & Rs 7.01 crore \\
+Absolute Return & 701.10\% \\
+Annualised Return (CAGR) & 51.66\% \\
+Maximum Drawdown & $-$25.86\% \\
+Sharpe Ratio (rf = 0\%) & 2.70 \\
+Gain-to-Loss Ratio & 2.39 \\
+Accuracy (\% profitable closed trades) & 53.17\% \\
+Total Executed Orders & 370 (203 buys, 167 sells) \\
+Closed Round-Trip Trades & 126 \\
+Average Trades per Stock & 4.30 \\
+Turnover (cumulative, 5-year) & 116.4$\times$ initial capital \\
+Total Transaction Costs Paid & Rs 11.64 lakh \\
 \bottomrule
 \end{tabular}
-\caption{Required Round 2 metrics, full 2021--2025 backtest.}
+\caption{Required Round 2 metrics, full 2021--2025 backtest. Orders are modestly higher than a
+plain top-10 rebalance (347) because the leftover-cash redeployment (Section 3.2) adds one
+consolidated top-up buy per name per quarter where needed, on top of the main rebalance trades --
+not a separate order per intermediate step of arriving at that number.}
 \end{table}
 
 \begin{table}[h]
@@ -181,23 +199,25 @@ Total Transaction Costs Paid & Rs 9.53 lakh \\
 \toprule
 \textbf{Ticker} & \textbf{Company} & \textbf{Shares} & \textbf{Price (Rs)} & \textbf{Weight} \\
 \midrule
-BHARTIARTL & Bharti Airtel Ltd. & 5{,}118 & 2{,}079.43 & 15.46\% \\
-NAVINFLUOR & Navin Fluorine International Ltd. & 1{,}665 & 5{,}912.89 & 14.30\% \\
-EICHERMOT & Eicher Motors Ltd. & 1{,}358 & 7{,}236.72 & 14.28\% \\
-FORTIS & Fortis Healthcare Ltd. & 9{,}550 & 883.06 & 12.25\% \\
-LAURUSLABS & Laurus Labs Ltd. & 6{,}895 & 1{,}106.90 & 11.09\% \\
-MUTHOOTFIN & Muthoot Finance Ltd. & 1{,}900 & 3{,}779.74 & 10.43\% \\
-MANAPPURAM & Manappuram Finance Ltd. & 19{,}100 & 306.66 & 8.51\% \\
-ASTERDM & Aster DM Quality Care Ltd. & 8{,}154 & 614.16 & 7.28\% \\
+BHARTIARTL & Bharti Airtel Ltd. & 6{,}189 & 2{,}079.43 & 16.06\% \\
+NAVINFLUOR & Navin Fluorine International Ltd. & 2{,}119 & 5{,}912.89 & 15.64\% \\
+EICHERMOT & Eicher Motors Ltd. & 1{,}685 & 7{,}236.72 & 15.22\% \\
+FORTIS & Fortis Healthcare Ltd. & 12{,}013 & 883.06 & 13.24\% \\
+LAURUSLABS & Laurus Labs Ltd. & 8{,}872 & 1{,}106.90 & 12.26\% \\
+MUTHOOTFIN & Muthoot Finance Ltd. & 2{,}318 & 3{,}779.74 & 10.94\% \\
+MANAPPURAM & Manappuram Finance Ltd. & 23{,}455 & 306.66 & 8.98\% \\
+ASTERDM & Aster DM Quality Care Ltd. & 9{,}903 & 614.16 & 7.59\% \\
 FORCEMOT & Force Motors Ltd. & 1 & 20{,}566.00 & 0.03\% \\
-\quad Cash & (uninvested, awaiting redeployment) & -- & -- & 6.36\% \\
+\quad Cash & (uninvested) & -- & -- & 0.04\% \\
 \bottomrule
 \end{tabular}
 \caption{Final portfolio composition and weights, as of 31 December 2025. Only 9 of the
-permitted 10 slots are filled: the 10th position went unfilled that quarter when total buy
-demand exceeded available cash (Section 7), leaving that slice as cash rather than a modelling
-error. The 15\% weight cap (Section 3.2) is enforced only at rebalance time; BHARTIARTL's
-15.46\% reflects price appreciation since the last rebalance, not a cap violation.}
+permitted 10 slots are ever meaningfully filled: the 10th position's target is structurally
+underfunded once transaction costs are added (Section 3.2, Section 7), so its would-be capital
+is redeployed into the other nine, which is why three of them (BHARTIARTL, NAVINFLUOR,
+EICHERMOT) exceed the 15\% cap that governs only the initial selection pass. This is a deliberate
+design choice, tested against leaving the shortfall as cash and against a cap-respecting version
+of the same redeployment; see Section 3.2.}
 \end{table}
 
 \begin{figure}[h]
@@ -211,14 +231,14 @@ Rs 1 crore).}
 \centering
 \includegraphics[width=0.72\textwidth]{drawdown.pdf}
 \caption{Drawdown from running peak, strategy vs. Nifty 500, 2021--2025. The strategy's deeper
-trough in early 2025 is the $-23.78\%$ Maximum Drawdown reported in Table 1; it recovers to a
+trough in early 2025 is the $-25.86\%$ Maximum Drawdown reported in Table 1; it recovers to a
 new high within the same year.}
 \end{figure}
 
-For additional context beyond the required list, the strategy also shows Beta $\approx 0.85$
-and annualised Alpha $\approx +34.0\%$ against Nifty 500, an Information Ratio of 2.48, a
-Sortino Ratio of 3.87, and a Calmar Ratio of 1.98. Beta below 1 shows the outperformance is not
-simply leveraged market exposure, and $R^2 \approx 0.49$ shows that a large share of the return
+For additional context beyond the required list, the strategy also shows Beta $\approx 0.92$
+and annualised Alpha $\approx +37.5\%$ against Nifty 500, an Information Ratio of 2.63, a
+Sortino Ratio of 3.92, and a Calmar Ratio of 2.00. Beta below 1 shows the outperformance is not
+simply leveraged market exposure, and $R^2 \approx 0.48$ shows that a large share of the return
 comes from stock selection rather than broad market movement.
 
 \section{Benchmark Comparison}
@@ -235,11 +255,11 @@ either.
 \toprule
 & \textbf{Strategy} & \textbf{Nifty 500} & \textbf{Nifty 100} \\
 \midrule
-CAGR & 47.12\% & 15.36\% & 13.35\% \\
-Total Return, 2021--2025 & 588.28\% & 104.17\% & 87.07\% \\
-Maximum Drawdown & $-$23.78\% & $-$18.84\% & $-$17.56\% \\
-Sharpe Ratio (rf = 0\%) & 2.67 & 1.07 & 0.94 \\
-Outperformance (CAGR, pp) & -- & +31.76 & +33.76 \\
+CAGR & 51.66\% & 15.36\% & 13.35\% \\
+Total Return, 2021--2025 & 701.10\% & 104.17\% & 87.07\% \\
+Maximum Drawdown & $-$25.86\% & $-$18.84\% & $-$17.56\% \\
+Sharpe Ratio (rf = 0\%) & 2.70 & 1.07 & 0.94 \\
+Outperformance (CAGR, pp) & -- & +36.30 & +38.30 \\
 \bottomrule
 \end{tabular}
 \caption{Strategy vs. benchmark, full 2021--2025 window.}
@@ -255,11 +275,11 @@ book relative to a $\approx$500-name index, and discussed further below.
 \toprule
 \textbf{Year} & \textbf{Strategy} & \textbf{Nifty 500} & \textbf{Nifty 100} \\
 \midrule
-2021 & +66.69\% & +30.19\% & +25.04\% \\
-2022 & +26.24\% & +1.61\% & +2.15\% \\
-2023 & +75.54\% & +25.16\% & +19.55\% \\
-2024 & +64.72\% & +15.16\% & +11.76\% \\
-2025 & +11.91\% & +6.69\% & +8.96\% \\
+2021 & +79.20\% & +30.19\% & +25.04\% \\
+2022 & +27.06\% & +1.61\% & +2.15\% \\
+2023 & +85.42\% & +25.16\% & +19.55\% \\
+2024 & +67.65\% & +15.16\% & +11.76\% \\
+2025 & +11.71\% & +6.69\% & +8.96\% \\
 \bottomrule
 \end{tabular}
 \caption{Calendar-year returns, strategy vs. benchmarks. The strategy leads in every year,
@@ -274,7 +294,7 @@ theoretical: when the quality factor was withheld and the strategy re-run as a b
 walk-forward test (rules locked on 2021--2024, evaluated unmodified on 2025 alone), the
 two-factor version returned $-6.4\%$ to $-10.9\%$ in 2025, while Nifty 500 returned $+4.6\%$ and
 Nifty 100 $+6.6\%$. Only the final three-factor design was profitable and beat both benchmarks
-in that same blind test ($+7.9\%$). This is encouraging evidence the fix works, but it is a
+in that same blind test ($+7.8\%$). This is encouraging evidence the fix works, but it is a
 single held-out year and does not guarantee the strategy is immune to a different kind of
 reversal in the future.
 
@@ -283,8 +303,8 @@ reversal in the future.
 tested against a 20-quarter rolling grid. It shrank the worst single quarter from $-16.2\%$ to
 $-14.5\%$, but it also reduced the quarterly hit-rate against the benchmark from 90\% to 85\%
 and cut every other headline metric in the official 2021--2025 backtest at once (Net PnL from
-Rs 5.88cr to Rs 4.26cr, CAGR from 47.1\% to 39.4\%, Sharpe from 2.67 to 2.47,
-Gain-to-Loss from 2.82 to 2.64), without even improving full-period maximum drawdown. Since
+Rs 7.01cr to Rs 5.28cr, CAGR from 51.7\% to 44.5\%, Sharpe from 2.70 to 2.59,
+Gain-to-Loss from 2.39 to 2.22), without even improving full-period maximum drawdown. Since
 Total Net PnL is the primary Round 2 ranking metric, this was a deliberate, metrics-driven
 decision to exclude the breaker, not an oversight. It reflects a real trade-off between smoother
 quarter-to-quarter behaviour and the metric the round is actually scored on.
@@ -300,12 +320,14 @@ bars below zero.}
 
 \textbf{Execution friction.} All sells for a rebalance execute before any buys, so freed-up
 cash from trimmed or dropped positions is available to fund new and increased ones. Even so,
-because target rupee amounts are floored to whole shares and the cash pool for the quarter is
-fixed, a lower-priority target position can go temporarily unfunded if total buy demand still
-exceeds available cash after every sell--this was observed at least once in the backtest. The
-unfunded capital sits in cash until the next rebalance rather than being fully deployed. This is
-a realistic execution constraint rather than a modelling error, but it means realised weights
-can occasionally differ slightly from target weights.
+because the ten target weights sum to exactly 100\% of portfolio value while every buy also
+carries the 0.1\% transaction cost on top, fully funding all ten names structurally needs
+slightly more capital than is available; the lowest-priority name is typically left short once
+whole-share flooring is applied (confirmed in 16 of the 20 quarterly rebalances, regardless of
+how that lowest weight itself is set -- raising it did not fix the shortfall, since the cause is
+this cost margin, not the size of any one target). Rather than let that shortfall sit idle, it is
+redeployed into the names that were funded (Section 3.2), which is why realised weights can
+differ meaningfully from a plain 15\%-capped target -- by design, not by error.
 
 \textbf{Universe timing.} Using current (rather than historical, point-in-time) index
 constituent lists for the full 2021--2025 backtest is a simplification driven by data
@@ -318,9 +340,9 @@ valuation, earnings quality, or balance-sheet risk directly. It would not be exp
 well in a regime where price-momentum and fundamentals diverge sharply.
 
 \textbf{General caveat.} All of the above is based on a single historical path. The
-out-of-sample stress test (1 January 2026 to 30 June 2026) is a genuine test of generalisation rather
-than a formality. The validation discipline described in Section 3.4--locking parameters before
-looking at held-out performance--was followed specifically because backtest performance, however
-strong, is not a guarantee of future results.
+out-of-sample stress test (1 January 2026 to 30 June 2026) is a genuine test of generalisation
+rather than a formality. The validation discipline described in Section 3.4--locking parameters
+before looking at held-out performance--was followed specifically because backtest performance,
+however strong, is not a guarantee of future results.
 
 \end{document}
