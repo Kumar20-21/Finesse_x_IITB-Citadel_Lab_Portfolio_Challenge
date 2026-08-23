@@ -141,7 +141,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                   dd_breaker=None, dd_breaker_frac=0.5, mom_ensemble=False,
                   sector_cap=None, industry_map=None, quality_weight=0.0,
                   downside_vol=False, regime_bench=None, regime_defensive_frac=0.5,
-                  volume=None, min_adv_pctile=None, invvol_eps=0.1):
+                  volume=None, min_adv_pctile=None, invvol_eps=0.1, cash_buffer=0.0):
     """
     weighting: "equal" | "score" | "invvol"
     reentry: allow mid-quarter re-entry once price reclaims its 200-DMA
@@ -158,6 +158,10 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
       allocation is scaled by regime_defensive_frac whenever the benchmark itself is below its
       own 200-DMA (a market-level, not stock-level, risk-off overlay).
     volume, min_adv_pctile: optional liquidity screen, see composite_scores().
+    cash_buffer: fraction of portfolio value deliberately left as cash at every rebalance
+      (target weights are scaled by (1 - cash_buffer) before being converted to rupee
+      allocations), so funding all N_HOLDINGS positions never structurally exceeds available
+      cash once the 0.1% transaction cost on each buy is accounted for.
     """
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
@@ -239,7 +243,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                 if regime_bench[date] < regime_sma[date]:
                     exposure_scale = regime_defensive_frac
 
-            target_alloc = {t: w[t] * port_val * exposure_scale for t in target_list}
+            target_alloc = {t: w[t] * port_val * exposure_scale * (1 - cash_buffer) for t in target_list}
 
             drop = [t for t in shares.index if shares[t] > 0 and t not in current_target_list]
             for t in drop:
