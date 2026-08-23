@@ -23,8 +23,19 @@ TREND_WINDOW = 200
 MOM_ENSEMBLE_LOOKBACKS = [63, 126, 252]  # 3M / 6M / 12M, each skipping the most recent month
 
 
+ADV_LOOKBACK = 20
+
+
 def composite_scores(close, as_of_date, mom_weight, mom_ensemble=False,
-                      quality_weight=0.0, downside_vol=False):
+                      quality_weight=0.0, downside_vol=False,
+                      volume=None, min_adv_pctile=None):
+    """
+    volume, min_adv_pctile: optional liquidity screen. If both given, stocks whose trailing
+      20-day average daily traded value (price x volume) falls below the min_adv_pctile
+      percentile of that day's eligible universe are excluded before scoring, so illiquid
+      names with stale-price (artificially low) measured volatility can't be favoured by the
+      Low-Vol factor or over-sized by inverse-vol weighting.
+    """
     idx_loc = close.index.get_loc(as_of_date)
     if idx_loc < MOM_LOOKBACK:
         return pd.Series(dtype=float), pd.Series(dtype=float)
@@ -56,6 +67,12 @@ def composite_scores(close, as_of_date, mom_weight, mom_ensemble=False,
     lowvol = -vol
 
     valid = z_mom.notna() & lowvol.notna() & mom_valid_mask
+
+    if volume is not None and min_adv_pctile is not None:
+        vol_px = volume.iloc[:idx_loc + 1]
+        adv = (px.iloc[-ADV_LOOKBACK:] * vol_px.iloc[-ADV_LOOKBACK:]).mean()
+        liquid = adv >= adv[valid].quantile(min_adv_pctile)
+        valid = valid & liquid.reindex(valid.index).fillna(False)
 
     if quality_weight > 0:
         window = px.iloc[-MOM_LOOKBACK:]
@@ -123,7 +140,8 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                   weight_cap=0.20, reentry=False, initial_capital=INITIAL_CAPITAL,
                   dd_breaker=None, dd_breaker_frac=0.5, mom_ensemble=False,
                   sector_cap=None, industry_map=None, quality_weight=0.0,
-                  downside_vol=False, regime_bench=None, regime_defensive_frac=0.5):
+                  downside_vol=False, regime_bench=None, regime_defensive_frac=0.5,
+                  volume=None, min_adv_pctile=None):
     """
     weighting: "equal" | "score" | "invvol"
     reentry: allow mid-quarter re-entry once price reclaims its 200-DMA
@@ -139,6 +157,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
     regime_bench: optional benchmark close-price Series; if given, at each rebalance the target
       allocation is scaled by regime_defensive_frac whenever the benchmark itself is below its
       own 200-DMA (a market-level, not stock-level, risk-off overlay).
+    volume, min_adv_pctile: optional liquidity screen, see composite_scores().
     """
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
@@ -197,7 +216,8 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
 
         if date in rebal_set:
             scores, vol = composite_scores(close, date, mom_weight, mom_ensemble=mom_ensemble,
-                                            quality_weight=quality_weight, downside_vol=downside_vol)
+                                            quality_weight=quality_weight, downside_vol=downside_vol,
+                                            volume=volume, min_adv_pctile=min_adv_pctile)
             target_list = select_top_n_with_sector_cap(scores, industry_map or {}, N_HOLDINGS, sector_cap=sector_cap)
             current_target_list = set(target_list)
             exited_pending_reentry = set()

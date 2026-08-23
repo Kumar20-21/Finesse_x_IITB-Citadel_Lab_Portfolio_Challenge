@@ -77,12 +77,14 @@ the exact data the submitted results were produced from.
 python3 validation/train_test_validation.py
 python3 validation/quarterly_robustness.py
 python3 validation/quality_weight_search.py
+python3 validation/liquidity_filter_search.py
 ```
 
 These reproduce the evidence discussed in the report's Methodology and Limitations sections:
 the train/2021-24-test/2025 split, the 20-quarter robustness grid (including why a tested
-drawdown-breaker variant was rejected), and the parameter search confirming the quality-factor
-weight is a stable choice rather than an overfit one.
+drawdown-breaker variant was rejected), the parameter search confirming the quality-factor
+weight is a stable choice rather than an overfit one, and the liquidity-screen test (also
+tested and rejected -- see script docstring for why).
 
 ## Data sources
 
