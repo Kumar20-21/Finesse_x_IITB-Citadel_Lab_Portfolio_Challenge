@@ -1,5 +1,5 @@
 \documentclass[11pt]{article}
-\usepackage[margin=2.0cm]{geometry}
+\usepackage[margin=1.9cm]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{amsmath}
@@ -84,7 +84,8 @@ $R^2$ of a linear trend fit to log-price over the same 12-month window, which pe
 parabolic price paths in favour of smoothly-trending ones. Each factor is cross-sectionally
 z-scored across all stocks with at least 95\% price history over the lookback window; stocks
 without enough history (mostly recent IPOs) are automatically excluded that quarter. The 10
-highest composite-score stocks are then selected.
+highest composite-score stocks are then selected. Section 3.3 works through this scoring for one
+real stock and rebalance date.
 
 \textbf{Why these three factors.} Momentum and low-volatility are two of the most extensively
 documented factors in equity research, and they are deliberately complementary rather than
@@ -108,7 +109,8 @@ high it ranks on the noisier composite score. Raw inverse-volatility affinities 
 by their minimum (plus a small constant) before normalising, then capped at 15\% of portfolio
 value per name. Any excess above the cap is redistributed proportionally among the remaining
 names, iterated until no name exceeds the cap. This keeps a single very low-volatility name
-from dominating the book.
+from dominating the book. Section 3.3 continues the worked example with this stock's weight
+assignment.
 
 The 15\% cap governs this initial selection and sizing pass only. Because the ten target weights
 sum to exactly 100\% while every buy also carries the 0.1\% transaction cost on top, fully funding
@@ -123,6 +125,24 @@ This design was chosen over leaving the shortfall as cash and over a version of 
 re-enforces the 15\% cap during top-up, after testing all three: it matched the other two on the
 20-quarter rolling hit-rate and on the 2025 held-out test, while improving CAGR and Sharpe over
 both.
+
+\subsection{Worked example}
+At the 1 October 2025 rebalance, across that day's $\approx$277 eligible stocks, 12-1 month
+momentum had cross-sectional mean $-2.55\%$ and standard deviation $26.06\%$. BHARTIARTL's own
+momentum was $+7.45\%$, giving $Z(\text{Momentum}) = (7.45 - (-2.55))/26.06 = 0.38$. The same
+$Z=(x-\text{mean})/\text{s.d.}$ formula applied to its trailing 90-day volatility (Low-Vol
+$-1.03\%$ vs. a cross-sectional mean of $-1.75\%$, s.d. $0.61\%$) gives $Z(\text{Low-Vol})=1.18$,
+and applied to its trend-quality $R^2$ ($0.76$ vs. a mean of $0.32$, s.d. $0.25$) gives
+$Z(\text{Quality})=1.75$. Its composite score, $0.5\times[0.5(0.38)+0.5(1.18)]+0.5(1.75)=1.27$,
+ranked 9th overall, placing it in the top 10 selected that quarter (Table 2).
+
+For weighting, BHARTIARTL's trailing 90-day volatility was $1.03\%$, giving a raw
+inverse-volatility affinity of $1/0.0103=97.0$. Across the ten selected names that quarter, the
+lowest affinity (Force Motors) was $26.3$; shifting every affinity down by this minimum plus a
+small constant ($\epsilon=0.1$) gives BHARTIARTL a shifted affinity of $97.0-26.3+0.1=70.8$,
+which is $70.8/345.6=20.5\%$ of the shifted total across all ten names. Since this exceeds the
+15\% cap, BHARTIARTL is capped at exactly $15\%$, and the excess $5.5$ percentage points is
+redistributed proportionally among the other nine names.
 
 \subsection{Rebalancing and risk management}
 Stock selection and target weights are decided quarterly. Only the delta needed to reach the new
@@ -328,15 +348,5 @@ respective index for the entire period.
 data-reliability problem for small and mid caps, but it also means the model cannot see
 valuation, earnings quality, or balance-sheet risk directly. It would not be expected to perform
 well in a regime where price-momentum and fundamentals diverge sharply.
-
-\textbf{Worked example.} At the 1 October 2025 rebalance, across that day's $\approx$277
-eligible stocks, 12-1 month momentum had cross-sectional mean $-2.55\%$ and standard deviation
-$26.06\%$. BHARTIARTL's own momentum was $+7.45\%$, giving
-$Z(\text{Momentum}) = (7.45 - (-2.55))/26.06 = 0.38$. The same $Z=(x-\text{mean})/\text{s.d.}$
-formula applied to its trailing 90-day volatility (Low-Vol $-1.03\%$ vs. a cross-sectional mean
-of $-1.75\%$, s.d. $0.61\%$) gives $Z(\text{Low-Vol})=1.18$, and applied to its trend-quality
-$R^2$ ($0.76$ vs. a mean of $0.32$, s.d. $0.25$) gives $Z(\text{Quality})=1.75$. Its composite
-score, $0.5\times[0.5(0.38)+0.5(1.18)]+0.5(1.75)=1.27$, ranked 9th overall, placing it in the
-top 10 selected that quarter (Table 2).
 
 \end{document}
