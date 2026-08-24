@@ -16,6 +16,10 @@
 \titlespacing*{\subsection}{0pt}{0.9em}{0.4em}
 
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+\raggedbottom
+\setlength{\textfloatsep}{8pt plus 1pt minus 1pt}
+\setlength{\intextsep}{6pt plus 1pt minus 1pt}
+\setlength{\floatsep}{6pt plus 1pt minus 1pt}
 
 \title{\vspace{-1.5em}\textbf{JP's Portfolio}}
 \author{Jyoti Pandey \quad Keshav Kumar}
@@ -76,12 +80,15 @@ eligible stock:
 \[
 \text{Composite} = 0.5\times\big[0.5\,Z(\text{Momentum}) + 0.5\,Z(\text{Low-Vol})\big] + 0.5\,Z(\text{Quality})
 \]
-which expands to effective weights of 0.25 on Momentum, 0.25 on Low-Vol, and 0.50 on Quality.
-Here, \textbf{Momentum} is the 12-month price return skipping the most recent month (the
-standard ``12-1'' construction, which avoids short-term reversal effects). \textbf{Low-Vol} is
-the negative of the trailing 90-day daily return standard deviation. \textbf{Quality} is the
-$R^2$ of a linear trend fit to log-price over the same 12-month window, which penalises spiky,
-parabolic price paths in favour of smoothly-trending ones. Each factor is cross-sectionally
+where:
+\begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=0.2em]
+\item \textbf{Momentum} is the 12-month price return skipping the most recent month (the
+standard ``12-1'' construction, which avoids short-term reversal effects).
+\item \textbf{Low-Vol} is the negative of the trailing 90-day daily return standard deviation.
+\item \textbf{Quality} is the $R^2$ of a linear trend fit to log-price over the same 12-month
+window, which penalises spiky, parabolic price paths in favour of smoothly-trending ones.
+\end{itemize}
+Each factor is cross-sectionally
 z-scored across all stocks with at least 95\% price history over the lookback window; stocks
 without enough history (mostly recent IPOs) are automatically excluded that quarter. The 10
 highest composite-score stocks are then selected. Section 3.3 works through this scoring for one
@@ -269,7 +276,6 @@ CAGR & 52.14\% & 15.36\% & 13.35\% \\
 Total Return, 2021--2025 & 714.03\% & 104.17\% & 87.07\% \\
 Maximum Drawdown & $-$25.10\% & $-$18.84\% & $-$17.56\% \\
 Sharpe Ratio (rf = 0\%) & 2.72 & 1.07 & 0.94 \\
-Outperformance (CAGR, pp) & N/A & +36.79 & +38.79 \\
 \bottomrule
 \end{tabular}
 \caption{Strategy vs. benchmark, full 2021--2025 window.}
