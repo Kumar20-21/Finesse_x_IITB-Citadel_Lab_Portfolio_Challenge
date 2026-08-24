@@ -286,35 +286,34 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                     continue
                 execute(t, date, 'SELL', shares[t], p)
 
-            # Sells before buys: trim over-target positions first so their freed cash is
-            # available to fund under-target positions in the same rebalance, regardless of
-            # scan order. Without this, a lower-priority buy can be starved of cash that a
-            # later-in-list sell would otherwise have released.
-            diffs = {}
+            # Every stage below (initial trim/buy, then the leftover-cash redeployment top-up)
+            # is worked out against a simulated cash/share balance first, accumulating a single
+            # signed net share delta per name. Only once every stage has been decided is each
+            # name's final delta executed as exactly one order -- never a separate order per
+            # stage, and never an offsetting sell-then-buy (or buy-then-sell) pair on the same
+            # name at the same price, which would just pay two lots of transaction cost for a
+            # net position that a single trade could reach directly.
+            net_delta = {}
+            sim_cash = cash
+            sim_shares = {t: shares[t] for t in target_list}
+            trimmed = set()
             for t in target_list:
                 p = px_today.get(t, np.nan)
                 if pd.isna(p) or p <= 0:
                     continue
-                diffs[t] = (target_alloc[t] - shares[t] * p, p)
-
-            for t, (diff_val, p) in diffs.items():
+                diff_val = target_alloc[t] - shares[t] * p
                 if diff_val < 0:
                     n = np.floor(min(shares[t], -diff_val / p))
                     if n >= 1:
-                        execute(t, date, 'SELL', n, p)
-
-            # Buys (main pass and, if enabled, the leftover-cash redeployment top-up) are
-            # accumulated per name against a simulated cash/share balance and executed as a
-            # single consolidated order per name at the end -- a real manager decides the final
-            # share count once and trades once, rather than placing a separate order for every
-            # intermediate step of arriving at that number.
-            buy_shares = {}
-            sim_cash = cash
-            for t, (diff_val, p) in diffs.items():
-                if diff_val > 0:
+                        net_delta[t] = net_delta.get(t, 0) - n
+                        sim_shares[t] -= n
+                        sim_cash += n * p * (1 - TXN_COST)
+                    trimmed.add(t)
+                elif diff_val > 0:
                     n = np.floor(diff_val / p)
                     if n >= 1 and n * p * (1 + TXN_COST) <= sim_cash:
-                        buy_shares[t] = buy_shares.get(t, 0) + n
+                        net_delta[t] = net_delta.get(t, 0) + n
+                        sim_shares[t] += n
                         sim_cash -= n * p * (1 + TXN_COST)
 
             if redeploy_leftover:
@@ -324,10 +323,13 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                 # shortfall idle or forcing it into the unfunded (typically riskiest) name.
                 # weight_cap governed the initial selection/sizing pass above; redeploy_cap
                 # (None by default) separately controls whether this top-up pass is capped.
-                sim_shares = {t: shares.get(t, 0) + buy_shares.get(t, 0) for t in target_list
-                              if shares.get(t, 0) > 0 or buy_shares.get(t, 0) > 0}
+                # Names being trimmed down this quarter are excluded even though they still
+                # hold shares > 0: this quarter's score already says they deserve less capital,
+                # so redeploying someone else's leftover cash back into a name just trimmed
+                # would contradict the rebalancing signal that trimmed it (confirmed empirically
+                # worse on every headline metric than excluding them, not just costlier to trade).
                 for _ in range(5):
-                    funded = [t for t, s in sim_shares.items() if s > 0]
+                    funded = [t for t in target_list if t not in trimmed and sim_shares.get(t, 0) > 0]
                     if not funded or sim_cash <= 0:
                         break
                     if redeploy_cap is not None:
@@ -353,15 +355,20 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                             extra_cash = min(extra_cash, headroom[t])
                         n = np.floor(extra_cash / p)
                         if n >= 1 and n * p * (1 + TXN_COST) <= sim_cash:
-                            buy_shares[t] = buy_shares.get(t, 0) + n
+                            net_delta[t] = net_delta.get(t, 0) + n
                             sim_shares[t] += n
                             sim_cash -= n * p * (1 + TXN_COST)
                             bought_any = True
                     if not bought_any:
                         break
 
-            for t, n in buy_shares.items():
-                if n >= 1:
+            for t, n in net_delta.items():
+                if n < 0:
+                    p = px_today.get(t, np.nan)
+                    if pd.notna(p) and p > 0:
+                        execute(t, date, 'SELL', -n, p)
+            for t, n in net_delta.items():
+                if n > 0:
                     p = px_today.get(t, np.nan)
                     if pd.notna(p) and p > 0 and n * p <= cash:
                         execute(t, date, 'BUY', n, p)

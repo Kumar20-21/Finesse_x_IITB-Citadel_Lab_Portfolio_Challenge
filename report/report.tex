@@ -1,5 +1,5 @@
 \documentclass[11pt]{article}
-\usepackage[margin=2.1cm]{geometry}
+\usepackage[margin=2.0cm]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{amsmath}
@@ -333,7 +333,11 @@ while already trading below its own 200-day average on rebalance day; such a nam
 (its allocation is zeroed and, if trend re-entry is enabled, it is queued to enter once price
 actually reclaims the average), since buying and then immediately re-selling it hours later at
 the same closing price would be a pure, avoidable transaction-cost loss. Two such cases occurred
-across the full backtest before this rule was added.
+across the full backtest before this rule was added. Similarly, a name being trimmed this
+quarter could still be redeployed into (Rs 308 was wasted this way on ANANTRAJ.NS, 2021-10-01,
+before the fix): every trading decision for a name is now netted into one signed order before
+execution, and a trimmed name is excluded from redeployment -- also confirmed better on CAGR,
+Sharpe and drawdown, not just cheaper to trade.
 
 \textbf{Universe timing.} Using current (rather than historical, point-in-time) index
 constituent lists for the full 2021--2025 backtest is a simplification driven by data
