@@ -142,7 +142,8 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                   sector_cap=None, industry_map=None, quality_weight=0.0,
                   downside_vol=False, regime_bench=None, regime_defensive_frac=0.5,
                   volume=None, min_adv_pctile=None, invvol_eps=0.1, cash_buffer=0.0,
-                  redeploy_leftover=False, redeploy_cap=None, n_holdings=N_HOLDINGS):
+                  redeploy_leftover=False, redeploy_cap=None, n_holdings=N_HOLDINGS,
+                  trend_buffer=0.0):
     """
     weighting: "equal" | "score" | "invvol"
     reentry: allow mid-quarter re-entry once price reclaims its 200-DMA
@@ -176,6 +177,10 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
       the redeployment pass too.
     n_holdings: number of names selected each quarter (default N_HOLDINGS=10, the submitted
       strategy's basket size).
+    trend_buffer: exit only triggers when price closes more than this fraction below the
+      moving average (default 0.0 = exit on any close below, the submitted behaviour);
+      re-entry requires price to be back above average * (1 - trend_buffer). A buffer adds
+      hysteresis around the average to reduce whipsaw exits on stocks oscillating near it.
     """
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
@@ -355,7 +360,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
             s = sma200.loc[date, t] if t in sma200.columns else np.nan
             if pd.isna(p) or pd.isna(s):
                 continue
-            if p < s:
+            if p < s * (1 - trend_buffer):
                 execute(t, date, 'SELL', shares[t], p)
                 if reentry and t in current_target_list:
                     exited_pending_reentry.add(t)
@@ -374,7 +379,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                 s = sma200.loc[date, t] if t in sma200.columns else np.nan
                 if pd.isna(p) or pd.isna(s):
                     continue
-                if p >= s:
+                if p >= s * (1 - trend_buffer):
                     alloc = target_alloc.get(t, 0)
                     n = np.floor(alloc / p)
                     if n >= 1 and n * p <= cash:
