@@ -329,10 +329,14 @@ data-reliability problem for small and mid caps, but it also means the model can
 valuation, earnings quality, or balance-sheet risk directly. It would not be expected to perform
 well in a regime where price-momentum and fundamentals diverge sharply.
 
-\textbf{Worked example.} At the 1 October 2025 rebalance, BHARTIARTL had a 12-1 month return of
-$+7.45\%$ ($Z=0.38$), a trailing 90-day volatility of $1.03\%$, i.e. Low-Vol $Z=1.18$, and a
-trend-quality $R^2$ of $0.76$ ($Z=1.75$), against that day's $\approx$277 eligible stocks. Its
-composite score, $0.5\times[0.5(0.38)+0.5(1.18)]+0.5(1.75)=1.27$, ranked 9th overall, placing it
-in the top 10 selected that quarter (Table 2).
+\textbf{Worked example.} At the 1 October 2025 rebalance, across that day's $\approx$277
+eligible stocks, 12-1 month momentum had cross-sectional mean $-2.55\%$ and standard deviation
+$26.06\%$. BHARTIARTL's own momentum was $+7.45\%$, giving
+$Z(\text{Momentum}) = (7.45 - (-2.55))/26.06 = 0.38$. The same $Z=(x-\text{mean})/\text{s.d.}$
+formula applied to its trailing 90-day volatility (Low-Vol $-1.03\%$ vs. a cross-sectional mean
+of $-1.75\%$, s.d. $0.61\%$) gives $Z(\text{Low-Vol})=1.18$, and applied to its trend-quality
+$R^2$ ($0.76$ vs. a mean of $0.32$, s.d. $0.25$) gives $Z(\text{Quality})=1.75$. Its composite
+score, $0.5\times[0.5(0.38)+0.5(1.18)]+0.5(1.75)=1.27$, ranked 9th overall, placing it in the
+top 10 selected that quarter (Table 2).
 
 \end{document}
