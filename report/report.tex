@@ -187,10 +187,7 @@ Turnover (cumulative, 5-year) & 115.2$\times$ initial capital \\
 Total Transaction Costs Paid & Rs 11.52 lakh \\
 \bottomrule
 \end{tabular}
-\caption{Required Round 2 metrics, full 2021--2025 backtest. Orders are modestly higher than a
-plain top-10 rebalance (347) because the leftover-cash redeployment (Section 3.2) adds one
-consolidated top-up buy per name per quarter where needed, on top of the main rebalance trades --
-not a separate order per intermediate step of arriving at that number.}
+\caption{Required Round 2 metrics, full 2021--2025 backtest.}
 \end{table}
 
 \begin{table}[h]
@@ -208,16 +205,12 @@ LAURUSLABS & Laurus Labs Ltd. & 8{,}078 & 1{,}106.90 & 10.98\% \\
 MANAPPURAM & Manappuram Finance Ltd. & 24{,}675 & 306.66 & 9.30\% \\
 ASTERDM & Aster DM Quality Care Ltd. & 9{,}553 & 614.16 & 7.21\% \\
 FORCEMOT & Force Motors Ltd. & 1 & 20{,}566.00 & 0.03\% \\
-\quad Cash & (uninvested) & -- & -- & 0.04\% \\
+\quad Cash & (uninvested) & N/A & N/A & 0.04\% \\
 \bottomrule
 \end{tabular}
 \caption{Final portfolio composition and weights, as of 31 December 2025. Only 9 of the
-permitted 10 slots are ever meaningfully filled: the 10th position's target is structurally
-underfunded once transaction costs are added (Section 3.2, Section 7), so its would-be capital
-is redeployed into the other nine, which is why three of them (BHARTIARTL, NAVINFLUOR,
-EICHERMOT) exceed the 15\% cap that governs only the initial selection pass. This is a deliberate
-design choice, tested against leaving the shortfall as cash and against a cap-respecting version
-of the same redeployment; see Section 3.2.}
+permitted 10 slots are filled; BHARTIARTL, NAVINFLUOR and EICHERMOT exceed the 15\%
+initial-selection cap (Section 3.2).}
 \end{table}
 
 \begin{figure}[h]
@@ -235,19 +228,16 @@ trough in early 2025 is the $-25.10\%$ Maximum Drawdown reported in Table 1; it 
 new high within the same year.}
 \end{figure}
 
-For additional context beyond the required list, the strategy also shows Beta $\approx 0.92$
-and annualised Alpha $\approx +38.0\%$ against Nifty 500, an Information Ratio of 2.65, a
-Sortino Ratio of 3.96, and a Calmar Ratio of 2.08. Beta below 1 shows the outperformance is not
-simply leveraged market exposure, and $R^2 \approx 0.48$ shows that a large share of the return
-comes from stock selection rather than broad market movement.
+For additional context beyond the required list, the strategy also shows Beta $\approx 0.92$,
+annualised Alpha of $+38.00\%$ against Nifty 500, an Information Ratio of 2.65, a Sortino Ratio
+of 3.96, a Calmar Ratio of 2.08, and $R^2 \approx 0.48$ against the benchmark.
 
 \section{Benchmark Comparison}
 
 \textbf{Benchmark choice.} Nifty 500 (index \texttt{\^{}CRSLDX}) is used as the primary
 benchmark because the eligible universe spans large, mid and small caps. A broad,
 $\approx$500-name, all-cap index is a more representative comparator than a large-cap-only index
-such as Nifty 100. Nifty 100 is reported alongside for completeness, since the challenge permits
-either.
+such as Nifty 100. Nifty 100 is reported alongside for completeness.
 
 \begin{table}[h]
 \centering
@@ -259,7 +249,7 @@ CAGR & 52.14\% & 15.36\% & 13.35\% \\
 Total Return, 2021--2025 & 714.03\% & 104.17\% & 87.07\% \\
 Maximum Drawdown & $-$25.10\% & $-$18.84\% & $-$17.56\% \\
 Sharpe Ratio (rf = 0\%) & 2.72 & 1.07 & 0.94 \\
-Outperformance (CAGR, pp) & -- & +36.79 & +38.79 \\
+Outperformance (CAGR, pp) & N/A & +36.79 & +38.79 \\
 \bottomrule
 \end{tabular}
 \caption{Strategy vs. benchmark, full 2021--2025 window.}
@@ -288,14 +278,13 @@ including the weak-market year 2022, when both benchmarks were roughly flat.}
 
 \section{Limitations and Discussion}
 
-\textbf{Concentration and momentum-crash risk.} A 10-stock, trailing-momentum-tilted portfolio
-is structurally more exposed to leadership-rotation risk than a broad index. This is not
-theoretical: when the quality factor was withheld and the strategy re-run as a blind,
-walk-forward test (rules locked on 2021--2024, evaluated unmodified on 2025 alone), the
-two-factor version returned $-6.4\%$ to $-10.9\%$ in 2025, while Nifty 500 returned $+4.6\%$ and
-Nifty 100 $+6.6\%$. Only the final three-factor design was profitable and beat both benchmarks
-in that same blind test ($+8.8\%$). This is encouraging evidence the fix works, but it is a
-single held-out year and does not guarantee the strategy is immune to a different kind of
+\textbf{Concentration and momentum-crash risk.} Holding 10 stocks concentrates idiosyncratic
+risk far more than a 500-name benchmark, and a momentum tilt adds a specific failure mode on top:
+trending stocks can reverse sharply once a rally becomes crowded (a ``momentum crash''). This is
+not theoretical -- a two-factor version of this strategy (momentum and low-volatility only, no
+quality/trend-smoothness) returned $-6.4\%$ to $-10.9\%$ in a blind 2025 test, while Nifty 500
+and Nifty 100 returned $+4.6\%$ and $+6.6\%$. Adding the quality factor fixed this in the same
+test ($+8.8\%$), but one held-out year does not guarantee immunity to a different kind of
 reversal in the future.
 
 \textbf{A tested and rejected risk control.} A portfolio-level drawdown circuit breaker
@@ -323,21 +312,12 @@ cash from trimmed or dropped positions is available to fund new and increased on
 because the ten target weights sum to exactly 100\% of portfolio value while every buy also
 carries the 0.1\% transaction cost on top, fully funding all ten names structurally needs
 slightly more capital than is available; the lowest-priority name is typically left short once
-whole-share flooring is applied (confirmed in 16 of the 20 quarterly rebalances, regardless of
-how that lowest weight itself is set -- raising it did not fix the shortfall, since the cause is
-this cost margin, not the size of any one target). Rather than let that shortfall sit idle, it is
-redeployed into the names that were funded (Section 3.2), which is why realised weights can
-differ meaningfully from a plain 15\%-capped target -- by design, not by error. Selection also
-does not itself check trend status, so a name can score well on momentum/low-volatility/quality
-while already trading below its own 200-day average on rebalance day; such a name is simply not
-bought (its allocation is zeroed and, if trend re-entry is enabled, it is queued to enter once
-price actually reclaims the average). Every trading decision for a name -- the initial trim or
-buy, and any redeployment top-up -- is netted into a single signed order before anything
-executes, so at most one buy or one sell is ever placed per name per rebalance. Names being
-trimmed this quarter are also excluded from redeployment entirely: this is a deliberate design
-rule, tested and confirmed to improve CAGR, Sharpe and drawdown, not merely a cheaper way to
-trade, since redeploying capital into a name the model just decided deserves less weight would
-undercut that quarter's own rebalancing signal.
+whole-share flooring is applied. Rather than let that shortfall sit idle, it is redeployed into
+the names that were funded (Section 3.2). Selection also does not itself check trend status, so
+a name can score well on momentum/low-volatility/quality while already trading below its own
+200-day average on rebalance day; such a name is simply not bought (its allocation is zeroed
+and, if trend re-entry is enabled, it is queued to enter once price actually reclaims the
+average). Names being trimmed this quarter are also excluded from redeployment.
 
 \textbf{Universe timing.} Using current (rather than historical, point-in-time) index
 constituent lists for the full 2021--2025 backtest is a simplification driven by data
