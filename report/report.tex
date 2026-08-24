@@ -172,19 +172,19 @@ repository (see the README for how to reproduce every number in this report).
 \toprule
 \textbf{Metric} & \textbf{Value} \\
 \midrule
-Final Portfolio Value & Rs 8.01 crore \\
-Total Net PnL & Rs 7.01 crore \\
-Absolute Return & 701.10\% \\
-Annualised Return (CAGR) & 51.66\% \\
-Maximum Drawdown & $-$25.86\% \\
-Sharpe Ratio (rf = 0\%) & 2.70 \\
-Gain-to-Loss Ratio & 2.39 \\
-Accuracy (\% profitable closed trades) & 53.17\% \\
-Total Executed Orders & 370 (203 buys, 167 sells) \\
-Closed Round-Trip Trades & 126 \\
-Average Trades per Stock & 4.30 \\
-Turnover (cumulative, 5-year) & 116.4$\times$ initial capital \\
-Total Transaction Costs Paid & Rs 11.64 lakh \\
+Final Portfolio Value & Rs 8.13 crore \\
+Total Net PnL & Rs 7.13 crore \\
+Absolute Return & 712.74\% \\
+Annualised Return (CAGR) & 52.10\% \\
+Maximum Drawdown & $-$25.85\% \\
+Sharpe Ratio (rf = 0\%) & 2.71 \\
+Gain-to-Loss Ratio & 2.26 \\
+Accuracy (\% profitable closed trades) & 54.10\% \\
+Total Executed Orders & 367 (204 buys, 163 sells) \\
+Closed Round-Trip Trades & 122 \\
+Average Trades per Stock & 4.32 \\
+Turnover (cumulative, 5-year) & 116.1$\times$ initial capital \\
+Total Transaction Costs Paid & Rs 11.61 lakh \\
 \bottomrule
 \end{tabular}
 \caption{Required Round 2 metrics, full 2021--2025 backtest. Orders are modestly higher than a
@@ -199,14 +199,14 @@ not a separate order per intermediate step of arriving at that number.}
 \toprule
 \textbf{Ticker} & \textbf{Company} & \textbf{Shares} & \textbf{Price (Rs)} & \textbf{Weight} \\
 \midrule
-BHARTIARTL & Bharti Airtel Ltd. & 6{,}189 & 2{,}079.43 & 16.06\% \\
-NAVINFLUOR & Navin Fluorine International Ltd. & 2{,}119 & 5{,}912.89 & 15.64\% \\
-EICHERMOT & Eicher Motors Ltd. & 1{,}685 & 7{,}236.72 & 15.22\% \\
-FORTIS & Fortis Healthcare Ltd. & 12{,}013 & 883.06 & 13.24\% \\
-LAURUSLABS & Laurus Labs Ltd. & 8{,}872 & 1{,}106.90 & 12.26\% \\
-MUTHOOTFIN & Muthoot Finance Ltd. & 2{,}318 & 3{,}779.74 & 10.94\% \\
-MANAPPURAM & Manappuram Finance Ltd. & 23{,}455 & 306.66 & 8.98\% \\
-ASTERDM & Aster DM Quality Care Ltd. & 9{,}903 & 614.16 & 7.59\% \\
+BHARTIARTL & Bharti Airtel Ltd. & 6{,}279 & 2{,}079.43 & 16.07\% \\
+NAVINFLUOR & Navin Fluorine International Ltd. & 2{,}150 & 5{,}912.89 & 15.64\% \\
+EICHERMOT & Eicher Motors Ltd. & 1{,}709 & 7{,}236.72 & 15.22\% \\
+FORTIS & Fortis Healthcare Ltd. & 12{,}189 & 883.06 & 13.24\% \\
+LAURUSLABS & Laurus Labs Ltd. & 9{,}001 & 1{,}106.90 & 12.26\% \\
+MUTHOOTFIN & Muthoot Finance Ltd. & 2{,}352 & 3{,}779.74 & 10.94\% \\
+MANAPPURAM & Manappuram Finance Ltd. & 23{,}798 & 306.66 & 8.98\% \\
+ASTERDM & Aster DM Quality Care Ltd. & 10{,}048 & 614.16 & 7.59\% \\
 FORCEMOT & Force Motors Ltd. & 1 & 20{,}566.00 & 0.03\% \\
 \quad Cash & (uninvested) & -- & -- & 0.04\% \\
 \bottomrule
@@ -231,13 +231,13 @@ Rs 1 crore).}
 \centering
 \includegraphics[width=0.72\textwidth]{drawdown.pdf}
 \caption{Drawdown from running peak, strategy vs. Nifty 500, 2021--2025. The strategy's deeper
-trough in early 2025 is the $-25.86\%$ Maximum Drawdown reported in Table 1; it recovers to a
+trough in early 2025 is the $-25.85\%$ Maximum Drawdown reported in Table 1; it recovers to a
 new high within the same year.}
 \end{figure}
 
-For additional context beyond the required list, the strategy also shows Beta $\approx 0.92$
-and annualised Alpha $\approx +37.5\%$ against Nifty 500, an Information Ratio of 2.63, a
-Sortino Ratio of 3.92, and a Calmar Ratio of 2.00. Beta below 1 shows the outperformance is not
+For additional context beyond the required list, the strategy also shows Beta $\approx 0.93$
+and annualised Alpha $\approx +37.9\%$ against Nifty 500, an Information Ratio of 2.65, a
+Sortino Ratio of 3.93, and a Calmar Ratio of 2.01. Beta below 1 shows the outperformance is not
 simply leveraged market exposure, and $R^2 \approx 0.48$ shows that a large share of the return
 comes from stock selection rather than broad market movement.
 
@@ -255,11 +255,11 @@ either.
 \toprule
 & \textbf{Strategy} & \textbf{Nifty 500} & \textbf{Nifty 100} \\
 \midrule
-CAGR & 51.66\% & 15.36\% & 13.35\% \\
-Total Return, 2021--2025 & 701.10\% & 104.17\% & 87.07\% \\
-Maximum Drawdown & $-$25.86\% & $-$18.84\% & $-$17.56\% \\
-Sharpe Ratio (rf = 0\%) & 2.70 & 1.07 & 0.94 \\
-Outperformance (CAGR, pp) & -- & +36.30 & +38.30 \\
+CAGR & 52.10\% & 15.36\% & 13.35\% \\
+Total Return, 2021--2025 & 712.74\% & 104.17\% & 87.07\% \\
+Maximum Drawdown & $-$25.85\% & $-$18.84\% & $-$17.56\% \\
+Sharpe Ratio (rf = 0\%) & 2.71 & 1.07 & 0.94 \\
+Outperformance (CAGR, pp) & -- & +36.74 & +38.74 \\
 \bottomrule
 \end{tabular}
 \caption{Strategy vs. benchmark, full 2021--2025 window.}
@@ -277,9 +277,9 @@ book relative to a $\approx$500-name index, and discussed further below.
 \midrule
 2021 & +79.20\% & +30.19\% & +25.04\% \\
 2022 & +27.06\% & +1.61\% & +2.15\% \\
-2023 & +85.42\% & +25.16\% & +19.55\% \\
-2024 & +67.65\% & +15.16\% & +11.76\% \\
-2025 & +11.71\% & +6.69\% & +8.96\% \\
+2023 & +86.05\% & +25.16\% & +19.55\% \\
+2024 & +68.47\% & +15.16\% & +11.76\% \\
+2025 & +12.39\% & +6.69\% & +8.96\% \\
 \bottomrule
 \end{tabular}
 \caption{Calendar-year returns, strategy vs. benchmarks. The strategy leads in every year,
@@ -294,7 +294,7 @@ theoretical: when the quality factor was withheld and the strategy re-run as a b
 walk-forward test (rules locked on 2021--2024, evaluated unmodified on 2025 alone), the
 two-factor version returned $-6.4\%$ to $-10.9\%$ in 2025, while Nifty 500 returned $+4.6\%$ and
 Nifty 100 $+6.6\%$. Only the final three-factor design was profitable and beat both benchmarks
-in that same blind test ($+7.8\%$). This is encouraging evidence the fix works, but it is a
+in that same blind test ($+8.7\%$). This is encouraging evidence the fix works, but it is a
 single held-out year and does not guarantee the strategy is immune to a different kind of
 reversal in the future.
 
@@ -303,8 +303,8 @@ reversal in the future.
 tested against a 20-quarter rolling grid. It shrank the worst single quarter from $-16.2\%$ to
 $-14.5\%$, but it also reduced the quarterly hit-rate against the benchmark from 90\% to 85\%
 and cut every other headline metric in the official 2021--2025 backtest at once (Net PnL from
-Rs 7.01cr to Rs 5.28cr, CAGR from 51.7\% to 44.5\%, Sharpe from 2.70 to 2.59,
-Gain-to-Loss from 2.39 to 2.22), without even improving full-period maximum drawdown. Since
+Rs 7.13cr to Rs 5.33cr, CAGR from 52.1\% to 44.7\%, Sharpe from 2.71 to 2.59,
+Gain-to-Loss from 2.26 to 2.12), without even improving full-period maximum drawdown. Since
 Total Net PnL is the primary Round 2 ranking metric, this was a deliberate, metrics-driven
 decision to exclude the breaker, not an oversight. It reflects a real trade-off between smoother
 quarter-to-quarter behaviour and the metric the round is actually scored on.
@@ -327,7 +327,13 @@ whole-share flooring is applied (confirmed in 16 of the 20 quarterly rebalances,
 how that lowest weight itself is set -- raising it did not fix the shortfall, since the cause is
 this cost margin, not the size of any one target). Rather than let that shortfall sit idle, it is
 redeployed into the names that were funded (Section 3.2), which is why realised weights can
-differ meaningfully from a plain 15\%-capped target -- by design, not by error.
+differ meaningfully from a plain 15\%-capped target -- by design, not by error. Selection also
+does not itself check trend status, so a name can score well on momentum/low-volatility/quality
+while already trading below its own 200-day average on rebalance day; such a name is not bought
+(its allocation is zeroed and, if trend re-entry is enabled, it is queued to enter once price
+actually reclaims the average), since buying and then immediately re-selling it hours later at
+the same closing price would be a pure, avoidable transaction-cost loss. Two such cases occurred
+across the full backtest before this rule was added.
 
 \textbf{Universe timing.} Using current (rather than historical, point-in-time) index
 constituent lists for the full 2021--2025 backtest is a simplification driven by data

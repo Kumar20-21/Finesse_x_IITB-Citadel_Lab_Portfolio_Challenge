@@ -111,12 +111,12 @@ compared against the two alternatives it beat in `redeploy_comparison.py`.
 
 | Metric | Value |
 |---|---|
-| Total Net PnL | Rs 7.01 crore |
-| Annualised Return (CAGR) | 51.66% |
-| Maximum Drawdown | -25.86% |
-| Sharpe Ratio (rf=0%) | 2.70 |
-| Gain-to-Loss Ratio | 2.39 |
-| Accuracy | 53.17% |
+| Total Net PnL | Rs 7.13 crore |
+| Annualised Return (CAGR) | 52.10% |
+| Maximum Drawdown | -25.85% |
+| Sharpe Ratio (rf=0%) | 2.71 |
+| Gain-to-Loss Ratio | 2.26 |
+| Accuracy | 54.10% |
 | Benchmark (Nifty 500) CAGR | 15.36% |
 
 Full metric list, methodology, and discussion of limitations are in `report/report.pdf`.

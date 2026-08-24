@@ -264,6 +264,21 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
 
             target_alloc = {t: w[t] * port_val * exposure_scale * (1 - cash_buffer) for t in target_list}
 
+            # A stock can score well on momentum/low-vol/quality while already trading below
+            # its own trend filter that same day -- selection doesn't check trend status. Buying
+            # it here would just be sold again by the same-day trend-filter check below, at the
+            # same closing price, for a guaranteed pure transaction-cost loss with zero chance of
+            # benefit (identical buy/sell price, same day). Zero its allocation instead, so any
+            # existing position is sold down normally and (if reentry is on) it re-enters via the
+            # standard mid-quarter mechanism once price actually reclaims the average.
+            for t in target_list:
+                p_t = px_today.get(t, np.nan)
+                s_t = sma200.loc[date, t] if t in sma200.columns else np.nan
+                if pd.notna(p_t) and pd.notna(s_t) and p_t < s_t * (1 - trend_buffer):
+                    target_alloc[t] = 0.0
+                    if reentry:
+                        exited_pending_reentry.add(t)
+
             drop = [t for t in shares.index if shares[t] > 0 and t not in current_target_list]
             for t in drop:
                 p = px_today.get(t, np.nan)
