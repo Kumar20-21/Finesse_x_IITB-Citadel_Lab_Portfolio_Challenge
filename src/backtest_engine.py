@@ -152,7 +152,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                   volume=None, min_adv_pctile=None, invvol_eps=0.1, cash_buffer=0.0,
                   redeploy_leftover=False, redeploy_cap=None, n_holdings=N_HOLDINGS,
                   trend_buffer=0.0, use_trend_filter=True, trend_check_every=1,
-                  ftrl_eta=1.0, ftrl_decay=1.0):
+                  ftrl_eta=1.0, ftrl_decay=1.0, staged_buffer=None, staged_split=0.5):
     """
     weighting: "equal" | "score" | "invvol" | "ftrl"
     reentry: allow mid-quarter re-entry once price reclaims its 200-DMA
@@ -201,6 +201,15 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
       is the textbook infinite-memory FTRL; decay<1 discounts older quarters so the allocation
       can adapt to regime change). Weights are then cap_normalize()-d at weight_cap, same as
       every other weighting scheme.
+    staged_buffer: if set (e.g. 0.08), replaces the binary trend_buffer/use_trend_filter exit
+      rule with a staged one for every name in that quarter's target_list: exposure is 0% while
+      price is more than staged_buffer below its 200-DMA, staged_split (e.g. 50%) while price is
+      within +/-staged_buffer of the average, and 100% once price is more than staged_buffer
+      above it. Checked at the same trend_check_every cadence. A name scaling in or out moves
+      toward the zone's target size rather than jumping straight to fully in or fully out, so a
+      quick reversal only ever costs the cost of the partial trade, not the full one.
+    staged_split: the fractional exposure held in the middle zone when staged_buffer is set
+      (default 0.5, i.e. half in/half out); ignored otherwise.
     """
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
@@ -222,10 +231,19 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
     avg_entry = pd.Series(np.nan, index=close.columns)
     current_target_list = set()
     target_alloc = {}
+    staged_base_alloc = {}
     exited_pending_reentry = set()
     quarter_peak = initial_capital
     breaker_triggered = False
     ftrl_cumscore = {}
+    staged_zone = {}
+
+    def staged_fraction(p, s):
+        if p >= s * (1 + staged_buffer):
+            return 1.0
+        if p >= s * (1 - staged_buffer):
+            return staged_split
+        return 0.0
 
     equity_curve, trade_log, closed_trades = [], [], []
 
@@ -294,21 +312,34 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                     exposure_scale = regime_defensive_frac
 
             target_alloc = {t: w[t] * port_val * exposure_scale * (1 - cash_buffer) for t in target_list}
+            staged_base_alloc = dict(target_alloc)
 
-            # A stock can score well on momentum/low-vol/quality while already trading below
-            # its own trend filter that same day -- selection doesn't check trend status. Buying
-            # it here would just be sold again by the same-day trend-filter check below, at the
-            # same closing price, for a guaranteed pure transaction-cost loss with zero chance of
-            # benefit (identical buy/sell price, same day). Zero its allocation instead, so any
-            # existing position is sold down normally and (if reentry is on) it re-enters via the
-            # standard mid-quarter mechanism once price actually reclaims the average.
-            for t in target_list:
-                p_t = px_today.get(t, np.nan)
-                s_t = sma200.loc[date, t] if t in sma200.columns else np.nan
-                if pd.notna(p_t) and pd.notna(s_t) and p_t < s_t * (1 - trend_buffer):
-                    target_alloc[t] = 0.0
-                    if reentry:
-                        exited_pending_reentry.add(t)
+            if staged_buffer is not None:
+                # Staged entry/exit: scale this quarter's target by the price-vs-trend zone
+                # (0%, staged_split, or 100%) right away, so a name entering mid-buffer starts
+                # at partial size instead of buying full then immediately trimming back.
+                for t in target_list:
+                    p_t = px_today.get(t, np.nan)
+                    s_t = sma200.loc[date, t] if t in sma200.columns else np.nan
+                    if pd.notna(p_t) and pd.notna(s_t):
+                        frac = staged_fraction(p_t, s_t)
+                        target_alloc[t] *= frac
+                        staged_zone[t] = frac
+            else:
+                # A stock can score well on momentum/low-vol/quality while already trading below
+                # its own trend filter that same day -- selection doesn't check trend status. Buying
+                # it here would just be sold again by the same-day trend-filter check below, at the
+                # same closing price, for a guaranteed pure transaction-cost loss with zero chance of
+                # benefit (identical buy/sell price, same day). Zero its allocation instead, so any
+                # existing position is sold down normally and (if reentry is on) it re-enters via the
+                # standard mid-quarter mechanism once price actually reclaims the average.
+                for t in target_list:
+                    p_t = px_today.get(t, np.nan)
+                    s_t = sma200.loc[date, t] if t in sma200.columns else np.nan
+                    if pd.notna(p_t) and pd.notna(s_t) and p_t < s_t * (1 - trend_buffer):
+                        target_alloc[t] = 0.0
+                        if reentry:
+                            exited_pending_reentry.add(t)
 
             drop = [t for t in shares.index if shares[t] > 0 and t not in current_target_list]
             for t in drop:
@@ -407,7 +438,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
             quarter_peak = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
             breaker_triggered = False
 
-        if use_trend_filter and day_idx % trend_check_every == 0:
+        if staged_buffer is None and use_trend_filter and day_idx % trend_check_every == 0:
             held = [t for t in shares.index if shares[t] > 0]
             for t in held:
                 p = px_today.get(t, np.nan)
@@ -419,7 +450,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                     if reentry and t in current_target_list:
                         exited_pending_reentry.add(t)
 
-        if use_trend_filter and day_idx % trend_check_every == 0 and reentry:
+        if staged_buffer is None and use_trend_filter and day_idx % trend_check_every == 0 and reentry:
             # Deterministic order: iterating a Python set directly is hash-seed dependent
             # (varies across process runs), which silently made cash-constrained re-entry
             # ties non-reproducible. Sort by target allocation (highest-conviction first)
@@ -439,6 +470,34 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                     if n >= 1 and n * p <= cash:
                         execute(t, date, 'BUY', n, p)
                     exited_pending_reentry.discard(t)
+
+        if staged_buffer is not None and use_trend_filter and day_idx % trend_check_every == 0:
+            # Move a currently-selected name toward its zone-appropriate exposure (0%,
+            # staged_split, or 100% of its full, un-scaled quarterly target) only when the zone
+            # itself actually changes -- not every day the price merely drifts within the same
+            # zone, which would otherwise force a tiny re-round-to-whole-shares trade daily
+            # purely from price noise, with no zone crossing involved at all.
+            deltas = {}
+            for t in current_target_list:
+                p = px_today.get(t, np.nan)
+                s = sma200.loc[date, t] if t in sma200.columns else np.nan
+                base = staged_base_alloc.get(t, 0)
+                if pd.isna(p) or pd.isna(s) or p <= 0 or base <= 0:
+                    continue
+                new_frac = staged_fraction(p, s)
+                if new_frac == staged_zone.get(t):
+                    continue
+                staged_zone[t] = new_frac
+                desired = np.floor(new_frac * base / p)
+                delta = desired - shares.get(t, 0)
+                if abs(delta) >= 1:
+                    deltas[t] = (delta, p)
+            for t, (delta, p) in deltas.items():
+                if delta < 0:
+                    execute(t, date, 'SELL', min(shares[t], -delta), p)
+            for t, (delta, p) in deltas.items():
+                if delta > 0 and delta * p <= cash:
+                    execute(t, date, 'BUY', delta, p)
 
         port_val = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
         quarter_peak = max(quarter_peak, port_val)
