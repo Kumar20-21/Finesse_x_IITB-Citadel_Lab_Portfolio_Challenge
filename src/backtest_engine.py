@@ -143,7 +143,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                   downside_vol=False, regime_bench=None, regime_defensive_frac=0.5,
                   volume=None, min_adv_pctile=None, invvol_eps=0.1, cash_buffer=0.0,
                   redeploy_leftover=False, redeploy_cap=None, n_holdings=N_HOLDINGS,
-                  trend_buffer=0.0):
+                  trend_buffer=0.0, use_trend_filter=True, trend_check_every=1):
     """
     weighting: "equal" | "score" | "invvol"
     reentry: allow mid-quarter re-entry once price reclaims its 200-DMA
@@ -181,6 +181,10 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
       moving average (default 0.0 = exit on any close below, the submitted behaviour);
       re-entry requires price to be back above average * (1 - trend_buffer). A buffer adds
       hysteresis around the average to reduce whipsaw exits on stocks oscillating near it.
+    use_trend_filter: if False, the daily 200-DMA exit/re-entry check never runs at all --
+      positions only change at quarterly rebalances (default True, the submitted behaviour).
+    trend_check_every: check the trend filter every this many trading days instead of every
+      single day (default 1 = daily, the submitted behaviour). E.g. 5 checks about weekly.
     """
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
@@ -234,7 +238,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
         trade_log.append({'Date': date, 'Ticker': ticker, 'Side': side,
                            'Shares': n_shares, 'Price': price, 'Notional': notional, 'Cost': cost})
 
-    for date in sim_days:
+    for day_idx, date in enumerate(sim_days):
         px_today = close.loc[date]
 
         if date in rebal_set:
@@ -376,18 +380,19 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
             quarter_peak = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
             breaker_triggered = False
 
-        held = [t for t in shares.index if shares[t] > 0]
-        for t in held:
-            p = px_today.get(t, np.nan)
-            s = sma200.loc[date, t] if t in sma200.columns else np.nan
-            if pd.isna(p) or pd.isna(s):
-                continue
-            if p < s * (1 - trend_buffer):
-                execute(t, date, 'SELL', shares[t], p)
-                if reentry and t in current_target_list:
-                    exited_pending_reentry.add(t)
+        if use_trend_filter and day_idx % trend_check_every == 0:
+            held = [t for t in shares.index if shares[t] > 0]
+            for t in held:
+                p = px_today.get(t, np.nan)
+                s = sma200.loc[date, t] if t in sma200.columns else np.nan
+                if pd.isna(p) or pd.isna(s):
+                    continue
+                if p < s * (1 - trend_buffer):
+                    execute(t, date, 'SELL', shares[t], p)
+                    if reentry and t in current_target_list:
+                        exited_pending_reentry.add(t)
 
-        if reentry:
+        if use_trend_filter and day_idx % trend_check_every == 0 and reentry:
             # Deterministic order: iterating a Python set directly is hash-seed dependent
             # (varies across process runs), which silently made cash-constrained re-entry
             # ties non-reproducible. Sort by target allocation (highest-conviction first)
