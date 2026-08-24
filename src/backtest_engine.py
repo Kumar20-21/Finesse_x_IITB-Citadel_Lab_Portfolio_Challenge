@@ -123,6 +123,14 @@ def select_top_n_with_sector_cap(scores, industry_map, n, sector_cap=None):
 def capped_weights(raw_affinity, cap, eps=0.1):
     shifted = raw_affinity - raw_affinity.min() + eps
     w = shifted / shifted.sum()
+    return cap_normalize(w, cap)
+
+
+def cap_normalize(raw_weights, cap):
+    """Normalise already-positive weights to sum to 1 and iteratively cap, without the
+    shift-by-minimum step in capped_weights() (which is specific to inverse-vol affinities and
+    would distort an already-meaningful weight scale such as softmax/FTRL weights)."""
+    w = raw_weights / raw_weights.sum()
     for _ in range(10):
         over = w > cap
         if not over.any():
@@ -143,9 +151,10 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
                   downside_vol=False, regime_bench=None, regime_defensive_frac=0.5,
                   volume=None, min_adv_pctile=None, invvol_eps=0.1, cash_buffer=0.0,
                   redeploy_leftover=False, redeploy_cap=None, n_holdings=N_HOLDINGS,
-                  trend_buffer=0.0, use_trend_filter=True, trend_check_every=1):
+                  trend_buffer=0.0, use_trend_filter=True, trend_check_every=1,
+                  ftrl_eta=1.0, ftrl_decay=1.0):
     """
-    weighting: "equal" | "score" | "invvol"
+    weighting: "equal" | "score" | "invvol" | "ftrl"
     reentry: allow mid-quarter re-entry once price reclaims its 200-DMA
     dd_breaker: if set (e.g. 0.08), de-risk dd_breaker_frac of every holding, once per
       quarter, the first time portfolio value falls dd_breaker fraction below its
@@ -185,6 +194,13 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
       positions only change at quarterly rebalances (default True, the submitted behaviour).
     trend_check_every: check the trend filter every this many trading days instead of every
       single day (default 1 = daily, the submitted behaviour). E.g. 5 checks about weekly.
+    ftrl_eta, ftrl_decay: only used when weighting="ftrl". Follow-the-Regularized-Leader with an
+      entropic regularizer reduces to the Hedge / multiplicative-weights update: weight on a
+      name is proportional to exp(ftrl_eta * cumulative composite score). Each rebalance, a
+      selected name's running score is cum = ftrl_decay * cum_prev + composite_score (decay=1.0
+      is the textbook infinite-memory FTRL; decay<1 discounts older quarters so the allocation
+      can adapt to regime change). Weights are then cap_normalize()-d at weight_cap, same as
+      every other weighting scheme.
     """
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
@@ -209,6 +225,7 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
     exited_pending_reentry = set()
     quarter_peak = initial_capital
     breaker_triggered = False
+    ftrl_cumscore = {}
 
     equity_curve, trade_log, closed_trades = [], [], []
 
@@ -258,6 +275,16 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
             elif weighting == "invvol":
                 inv = 1.0 / vol.loc[target_list]
                 w = capped_weights(inv, cap=weight_cap, eps=invvol_eps)
+            elif weighting == "ftrl":
+                # Follow-the-Regularized-Leader with an entropic regularizer: weight on a name
+                # is proportional to exp(eta * cumulative score). Names outside target_list keep
+                # whatever cumulative score they last had (frozen, not reset), so a name that
+                # drops out and later re-enters resumes from its prior history rather than
+                # starting cold.
+                for t in target_list:
+                    ftrl_cumscore[t] = ftrl_decay * ftrl_cumscore.get(t, 0.0) + scores[t]
+                raw = pd.Series({t: np.exp(ftrl_eta * ftrl_cumscore[t]) for t in target_list})
+                w = cap_normalize(raw, weight_cap)
             else:
                 raise ValueError(weighting)
 
