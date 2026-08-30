@@ -1,4 +1,4 @@
-# Finesse x Citadel Portfolio Challenge — Round 2
+# Finesse x IITB-Citadel Lab Portfolio Challenge — Round 2
 
 **Team JP's Portfolio** — Keshav Kumar, Jyoti Pandey
 
