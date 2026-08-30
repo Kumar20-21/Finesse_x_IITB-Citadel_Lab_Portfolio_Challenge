@@ -1,23 +1,6 @@
 """
-Run the official submitted strategy over the full 1 Jan 2021 - 31 Dec 2025 backtest window
-and save the results (equity curve, trade log, closed trades) to results/.
-
-Strategy configuration (see report Section: Methodology for the full rationale):
-  - Composite score per stock, recomputed every quarter:
-        0.5 x [0.5 x Z(12-1 month momentum) + 0.5 x Z(low-volatility)] + 0.5 x Z(trend-quality R^2)
-  - Top 10 stocks by composite score are selected each quarter.
-  - Positions are sized inverse-volatility, capped at 15% for the initial selection/sizing pass.
-  - Any cash left over after that pass (e.g. because a lower-priority name went unfunded once
-    transaction costs are added) is redeployed into the names that WERE funded, proportional to
-    their own target weights -- this redeployment pass is deliberately allowed to push a name's
-    weight past 15%, since the cap governs initial selection risk, not the use of leftover cash
-    from an already-capped selection. Tested against leaving it as idle cash and against a
-    cap-respecting version of the same redeployment; this version won on CAGR, Sharpe, and the
-    20-quarter rolling hit-rate while matching both real holdouts (2025, 2026 H1) -- see
-    validation/redeploy_comparison.py.
-  - A 200-day moving average trend filter exits (and can re-enter) any position daily,
-    independent of the quarterly rebalance schedule.
-  - 0.1% transaction cost on every buy and every sell.
+Runs the submitted strategy over 2021-01-01 to 2025-12-31 and saves the equity curve, trade
+log, and closed trades to results/.
 
 Usage:
     python src/run_backtest.py
@@ -32,9 +15,7 @@ END = "2025-12-31"
 
 STRATEGY_CONFIG = dict(
     mom_weight=0.5,
-    weighting="invvol",
     weight_cap=0.15,
-    reentry=True,
     quality_weight=0.5,
     redeploy_leftover=True,
 )
@@ -53,7 +34,7 @@ def main():
     trade_log.to_pickle("results/trade_log.pkl")
     closed_trades.to_pickle("results/closed_trades.pkl")
 
-    print_summary(summarize(eq, trade_log, closed_trades, label="Official submitted strategy, 2021-2025"))
+    print_summary(summarize(eq, trade_log, closed_trades, label="Submitted strategy, 2021-2025"))
 
 
 if __name__ == "__main__":

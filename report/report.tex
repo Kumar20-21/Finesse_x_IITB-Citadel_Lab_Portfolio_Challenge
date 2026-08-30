@@ -41,11 +41,10 @@ The central idea is a single, fully systematic composite-factor strategy applied
 every eligible stock: a quarterly-rebalanced ranking on three price-based factors (12-1 month
 momentum, low-volatility, and a trend-quality measure), sized by inverse volatility with a
 concentration cap on the initial selection, with any leftover cash redeployed into the names
-already selected. A daily 200-day moving-average trend filter overlays this quarterly cycle for
-additional risk management. The design was deliberately kept simple and fully rule-based.
-Therefore, it can be traced exactly how the portfolio was produced at any point in time. It was
-also validated using a train/test split and a rolling-window robustness check, rather than
-chosen purely for the highest in-sample return, in anticipation of the forward stress test.
+already selected. The design was deliberately kept simple and fully rule-based, so it can be
+traced exactly how the portfolio was produced at any point in time. It was also validated using a
+train/test split and a rolling-window robustness check, rather than chosen purely for the highest
+in-sample return, in anticipation of the forward stress test.
 
 \section{Data}
 
@@ -57,14 +56,14 @@ available, the current constituent lists are applied retroactively across the fu
 backtest; this is a stated simplification (see Limitations).
 
 \textbf{Prices.} Daily OHLCV data for every universe stock and for the two benchmark indices was
-downloaded via the \texttt{yfinance} package, covering June 2019 onward (well before the 2021
-backtest start) through the end of the backtest. Prices are auto-adjusted closes (dividend- and
-split-adjusted). Only the adjusted \emph{close} column feeds the model itself; open/high/low/volume
-are downloaded but not used by the current strategy. The extra
-pre-2021 history is a buffer so the 252-day momentum/quality lookback and the 200-day trend
-filter have sufficient data from day one of the backtest. At each quarterly rebalance, any stock
-with less than 95\% price coverage over the lookback window (mostly recent IPOs) is excluded
-from that quarter's ranking rather than treated as having a zero or missing score.
+downloaded via the \texttt{yfinance} package, covering well before the 2021 backtest start
+through the end of the backtest. Prices are auto-adjusted closes (dividend- and split-adjusted).
+Only the adjusted \emph{close} column feeds the model itself; open/high/low/volume are downloaded
+but not used by the current strategy. The extra pre-2021 history is a buffer so the 252-day
+momentum/quality lookback has sufficient data from day one of the backtest. At each quarterly
+rebalance, any stock with less than 95\% price coverage over the lookback window (mostly recent
+IPOs) is excluded from that quarter's ranking rather than treated as having a zero or missing
+score.
 
 \textbf{Fundamental data.} No fundamental data (earnings, book value, ROE, etc.) is used. This
 is a deliberate choice, not an oversight: reliable, point-in-time fundamental data free of
@@ -129,9 +128,8 @@ forcing capital into the unfunded (typically highest-volatility) name or leaving
 redeployment pass is deliberately allowed to push a name above 15\%: the cap is a selection-risk
 control, not a hard ceiling on what happens to leftover cash from an already-capped selection.
 This design was chosen over leaving the shortfall as cash and over a version of redeployment that
-re-enforces the 15\% cap during top-up, after testing all three: it matched the other two on the
-20-quarter rolling hit-rate and on the 2025 held-out test, while improving CAGR and Sharpe over
-both.
+re-enforces the 15\% cap during top-up, after testing all three: it won on CAGR, Sharpe and the
+2025 held-out test, and matched or led on the 20-quarter rolling hit-rate.
 
 \subsection{Worked example}
 At the 1 October 2025 rebalance, across that day's $\approx$277 eligible stocks, 12-1 month
@@ -152,15 +150,15 @@ which is $70.8/345.6=20.5\%$ of the shifted total across all ten names. Since th
 redistributed proportionally among the other nine names.
 
 \subsection{Rebalancing and risk management}
-Stock selection and target weights are decided quarterly. Only the delta needed to reach the new
-target is traded for names that remain selected, while dropped names are fully sold and new
-entrants are bought to target. Independent of this quarterly schedule, a 200-day moving-average
-trend filter is checked \emph{daily} on every held position. If a stock's close falls below its
-own 200-day average, the position is fully exited to cash (a defensive rule, not a directional
-bet). If price reclaims the average before the next rebalance, the position is re-bought using
-the cash reserved for that slot. A flat 0.1\% transaction cost is charged on the notional value
-of every executed buy and sell, and is deducted directly from cash. This means it compounds into
-every subsequent decision rather than being a cosmetic adjustment applied at the end.
+Stock selection and target weights are decided quarterly (first trading day of
+Jan/Apr/Jul/Oct); positions are held unchanged between rebalances. Only the delta needed to
+reach the new target is traded for names that remain selected, while dropped names are fully
+sold and new entrants are bought to target. A selected stock already trading below its own
+200-day average on the rebalance date itself is not bought that quarter -- a one-time check at
+the point of purchase, not ongoing daily monitoring (Section 7). A flat 0.1\% transaction cost is
+charged on the notional value of every executed buy and sell, deducted directly from cash, so it
+compounds into every subsequent decision rather than being a cosmetic adjustment applied at the
+end.
 
 \subsection{Consistency and parameter selection}
 The same formula, thresholds and rules are applied to every one of the $\approx$300
@@ -168,9 +166,9 @@ eligible stocks with no per-stock discretion. The one free parameter with any re
 behind it--the 50\% weight given to the quality factor--was selected using only 2021--2024
 training data and full-backtest metrics, deliberately excluding the 2025 held-out test, via a
 0.001-resolution grid search. That search confirmed the chosen weight sits inside a genuine
-stable plateau (0.499--0.503, five consecutive 0.001-steps giving bit-identical results) rather
-than an isolated, fragile spike. This distinction matters because it is easy to overfit a single
-free parameter to one backtest window.
+stable plateau (0.499 and 0.500 are bit-identical on the full backtest; 0.501--0.503 sit within
+0.1 percentage point of the same result) rather than an isolated, fragile spike. This distinction
+matters because it is easy to overfit a single free parameter to one backtest window.
 
 \subsection{Key assumptions}
 \begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=0.2em]
@@ -199,19 +197,19 @@ repository (see the README for how to reproduce every number in this report).
 \toprule
 \textbf{Metric} & \textbf{Value} \\
 \midrule
-Final Portfolio Value & Rs 8.14 crore \\
-Total Net PnL & Rs 7.14 crore \\
-Absolute Return & 714.03\% \\
-Annualised Return (CAGR) & 52.14\% \\
-Maximum Drawdown & $-$25.10\% \\
-Sharpe Ratio (rf = 0\%) & 2.72 \\
-Gain-to-Loss Ratio & 2.40 \\
-Accuracy (\% profitable closed trades) & 54.92\% \\
-Total Executed Orders & 325 (165 buys, 160 sells) \\
-Closed Round-Trip Trades & 122 \\
-Average Trades per Stock & 3.78 \\
-Turnover (cumulative, 5-year) & 115.2$\times$ initial capital \\
-Total Transaction Costs Paid & Rs 11.52 lakh \\
+Final Portfolio Value & Rs 7.37 crore \\
+Total Net PnL & Rs 6.37 crore \\
+Absolute Return & 637.19\% \\
+Annualised Return (CAGR) & 49.15\% \\
+Maximum Drawdown & $-$30.07\% \\
+Sharpe Ratio (rf = 0\%) & 2.35 \\
+Gain-to-Loss Ratio & 1.70 \\
+Accuracy (\% profitable closed trades) & 61.62\% \\
+Total Executed Orders & 279 (141 buys, 138 sells) \\
+Closed Round-Trip Trades & 99 \\
+Average Trades per Stock & 3.28 \\
+Turnover (cumulative, 5-year) & 91.1$\times$ initial capital \\
+Total Transaction Costs Paid & Rs 9.11 lakh \\
 \bottomrule
 \end{tabular}
 \caption{Required Round 2 metrics, full 2021--2025 backtest.}
@@ -223,14 +221,14 @@ Total Transaction Costs Paid & Rs 11.52 lakh \\
 \toprule
 \textbf{Ticker} & \textbf{Company} & \textbf{Shares} & \textbf{Price (Rs)} & \textbf{Weight} \\
 \midrule
-NAVINFLUOR & Navin Fluorine International Ltd. & 2{,}283 & 5{,}912.89 & 16.58\% \\
-BHARTIARTL & Bharti Airtel Ltd. & 6{,}441 & 2{,}079.43 & 16.45\% \\
-EICHERMOT & Eicher Motors Ltd. & 1{,}805 & 7{,}236.72 & 16.05\% \\
-FORTIS & Fortis Healthcare Ltd. & 11{,}188 & 883.06 & 12.14\% \\
-MUTHOOTFIN & Muthoot Finance Ltd. & 2{,}419 & 3{,}779.74 & 11.23\% \\
-LAURUSLABS & Laurus Labs Ltd. & 8{,}078 & 1{,}106.90 & 10.98\% \\
-MANAPPURAM & Manappuram Finance Ltd. & 24{,}675 & 306.66 & 9.30\% \\
-ASTERDM & Aster DM Quality Care Ltd. & 9{,}553 & 614.16 & 7.21\% \\
+NAVINFLUOR & Navin Fluorine International Ltd. & 2{,}066 & 5{,}912.89 & 16.57\% \\
+BHARTIARTL & Bharti Airtel Ltd. & 5{,}833 & 2{,}079.43 & 16.45\% \\
+EICHERMOT & Eicher Motors Ltd. & 1{,}635 & 7{,}236.72 & 16.05\% \\
+FORTIS & Fortis Healthcare Ltd. & 10{,}133 & 883.06 & 12.14\% \\
+MUTHOOTFIN & Muthoot Finance Ltd. & 2{,}190 & 3{,}779.74 & 11.23\% \\
+LAURUSLABS & Laurus Labs Ltd. & 7{,}316 & 1{,}106.90 & 10.99\% \\
+MANAPPURAM & Manappuram Finance Ltd. & 22{,}353 & 306.66 & 9.30\% \\
+ASTERDM & Aster DM Quality Care Ltd. & 8{,}652 & 614.16 & 7.21\% \\
 FORCEMOT & Force Motors Ltd. & 1 & 20{,}566.00 & 0.03\% \\
 \quad Cash & (uninvested) & N/A & N/A & 0.04\% \\
 \bottomrule
@@ -248,15 +246,15 @@ Rs 1 crore).}
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.72\textwidth]{drawdown.pdf}
-\caption{Drawdown from running peak, strategy vs. Nifty 500, 2021--2025. The strategy's deeper
-trough in early 2025 is the $-25.10\%$ Maximum Drawdown reported in Table 1; it recovers to a
-new high within the same year.}
+\caption{Drawdown from running peak, strategy vs. Nifty 500, 2021--2025. The strategy's deepest
+trough is the $-30.07\%$ Maximum Drawdown reported in Table 1; it subsequently recovers to a new
+high.}
 \end{figure}
 
-For additional context beyond the required list, the strategy also shows Beta $\approx 0.92$ and
-annualised Alpha of $+38.00\%$ against Nifty 500 (CAGR $-$ Beta $\times$ benchmark CAGR; distinct
-from Table 3's raw $+36.79$pp outperformance since Beta is below 1), an Information Ratio of
-2.65, a Sortino Ratio of 3.96, a Calmar Ratio of 2.08, and $R^2 \approx 0.48$ against the
+For additional context beyond the required list, the strategy also shows Beta $\approx 1.05$ and
+annualised Alpha of $+32.96\%$ against Nifty 500 (CAGR $-$ Beta $\times$ benchmark CAGR; slightly
+below Table 3's raw $+33.80$pp outperformance since Beta is above 1), an Information Ratio of
+2.34, a Sortino Ratio of 3.38, a Calmar Ratio of 1.63, and $R^2 \approx 0.53$ against the
 benchmark.
 
 \section{Benchmark Comparison}
@@ -272,10 +270,10 @@ such as Nifty 100. Nifty 100 is reported alongside for completeness.
 \toprule
 & \textbf{Strategy} & \textbf{Nifty 500} & \textbf{Nifty 100} \\
 \midrule
-CAGR & 52.14\% & 15.36\% & 13.35\% \\
-Total Return, 2021--2025 & 714.03\% & 104.17\% & 87.07\% \\
-Maximum Drawdown & $-$25.10\% & $-$18.84\% & $-$17.56\% \\
-Sharpe Ratio (rf = 0\%) & 2.72 & 1.07 & 0.94 \\
+CAGR & 49.15\% & 15.36\% & 13.35\% \\
+Total Return, 2021--2025 & 637.19\% & 104.17\% & 87.07\% \\
+Maximum Drawdown & $-$30.07\% & $-$18.84\% & $-$17.56\% \\
+Sharpe Ratio (rf = 0\%) & 2.35 & 1.07 & 0.94 \\
 \bottomrule
 \end{tabular}
 \caption{Strategy vs. benchmark, full 2021--2025 window.}
@@ -291,11 +289,11 @@ book relative to a $\approx$500-name index, and discussed further below.
 \toprule
 \textbf{Year} & \textbf{Strategy} & \textbf{Nifty 500} & \textbf{Nifty 100} \\
 \midrule
-2021 & +80.81\% & +30.19\% & +25.04\% \\
-2022 & +28.09\% & +1.61\% & +2.15\% \\
-2023 & +86.51\% & +25.16\% & +19.55\% \\
-2024 & +70.13\% & +15.16\% & +11.76\% \\
-2025 & +9.23\% & +6.69\% & +8.96\% \\
+2021 & +84.32\% & +30.19\% & +25.04\% \\
+2022 & +18.31\% & +3.02\% & +3.63\% \\
+2023 & +82.87\% & +25.76\% & +20.05\% \\
+2024 & +68.81\% & +15.16\% & +11.76\% \\
+2025 & +9.50\% & +6.69\% & +8.96\% \\
 \bottomrule
 \end{tabular}
 \caption{Calendar-year returns, strategy vs. benchmarks. The strategy leads in every year,
@@ -308,29 +306,27 @@ including the weak-market year 2022, when both benchmarks were roughly flat.}
 risk far more than a 500-name benchmark, and a momentum tilt adds a specific failure mode on top:
 trending stocks can reverse sharply once a rally becomes crowded (a ``momentum crash''). This is
 not theoretical -- a two-factor version of this strategy (momentum and low-volatility only, no
-quality/trend-smoothness) returned $-6.4\%$ to $-10.9\%$ in a blind 2025 test, while Nifty 500
-and Nifty 100 returned $+4.6\%$ and $+6.6\%$. Adding the quality factor fixed this in the same
-test ($+8.8\%$), but one held-out year does not guarantee immunity to a different kind of
-reversal in the future.
+quality/trend-smoothness) returned $-5.40\%$ in a blind 2025 test, while Nifty 500 returned
+$+4.61\%$. Adding the quality factor fixed this in the same test ($+7.93\%$), but one held-out
+year does not guarantee immunity to a different kind of reversal in the future.
 
 \textbf{A tested and rejected risk control.} A portfolio-level drawdown circuit breaker
 (de-risking 50\% of the book whenever it fell more than 8\% from its post-rebalance peak) was
-tested against a 20-quarter rolling grid. It shrank the worst single quarter from $-16.2\%$ to
-$-14.5\%$ and trimmed full-period maximum drawdown from $-25.1\%$ to $-24.4\%$, but it also
-reduced the quarterly hit-rate against the benchmark from 90\% to 85\% and cut every other
-headline metric in the official 2021--2025 backtest at once (Net PnL from Rs 7.14cr to
-Rs 5.70cr, CAGR from 52.1\% to 46.3\%, Sharpe from 2.72 to 2.69, Gain-to-Loss from 2.40 to
-2.23). Since Total Net PnL is the primary Round 2 ranking metric, this was a deliberate,
-metrics-driven decision to exclude the breaker, not an oversight. It reflects a real trade-off
-between shallower drawdowns and the metric the round is actually scored on.
+tested against a 20-quarter rolling grid. It shrank the worst single quarter's excess over
+benchmark from $-10.68$pp to $-9.00$pp and reduced full-period maximum drawdown from $-30.07\%$
+to $-25.15\%$, and Sharpe actually improved slightly (2.35 to 2.50). However, it cut Total Net
+PnL from Rs 6.37cr to Rs 5.35cr and CAGR from 49.15\% to 44.76\%. Since Total Net PnL is the
+primary Round 2 ranking metric, this was a deliberate, metrics-driven decision to exclude the
+breaker, not an oversight. It reflects a real trade-off between shallower drawdowns and the
+metric the round is actually scored on.
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.72\textwidth]{quarterly_excess.pdf}
 \caption{Excess return over Nifty 500 in each of the 20 independent calendar-quarter backtests
-used for the robustness grid above (the submitted, breaker-free strategy). 18 of 20 quarters
-(90\%) beat the benchmark; the two losing quarters, 2021Q1 and 2025Q1, are visible as the only
-bars below zero.}
+used for the robustness grid above (the submitted strategy). 16 of 20 quarters (80\%) beat the
+benchmark; the four losing quarters (2021Q1, 2022Q2, 2024Q4, 2025Q1) are visible as the bars
+below zero.}
 \end{figure}
 
 \textbf{Execution friction.} All sells for a rebalance execute before any buys, so freed-up
@@ -341,9 +337,9 @@ slightly more capital than is available; the lowest-priority name is typically l
 whole-share flooring is applied. Rather than let that shortfall sit idle, it is redeployed into
 the names that were funded (Section 3.2). Selection also does not itself check trend status, so
 a name can score well on momentum/low-volatility/quality while already trading below its own
-200-day average on rebalance day; such a name is simply not bought (its allocation is zeroed
-and, if trend re-entry is enabled, it is queued to enter once price actually reclaims the
-average). Names being trimmed this quarter are also excluded from redeployment.
+200-day average on rebalance day; such a name is simply not bought that quarter (its allocation
+is zeroed), and may be selected again at a later rebalance once it recovers above its own
+average. Names being trimmed this quarter are also excluded from redeployment.
 
 \textbf{Universe timing.} Using current (rather than historical, point-in-time) index
 constituent lists for the full 2021--2025 backtest is a simplification driven by data

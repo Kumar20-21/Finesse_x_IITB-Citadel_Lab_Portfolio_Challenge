@@ -1,15 +1,8 @@
 """
-Generate every chart used in report/report.tex, so the figures are reproducible from the
-committed data/results exactly like the numbers (see README).
+Generates the charts used in report/report.tex: equity_curve.pdf, drawdown.pdf, and
+quarterly_excess.pdf, written to report/.
 
-Produces, all written to report/:
-  - equity_curve.pdf      Portfolio value vs. Nifty 500 and Nifty 100, 2021-2025
-  - drawdown.pdf           Drawdown from running peak, strategy vs. Nifty 500, 2021-2025
-  - quarterly_excess.pdf   Strategy excess return over Nifty 500, per calendar quarter
-                           (the 20-quarter robustness grid referenced in the report's
-                           Limitations section)
-
-Usage (run from the repo root):
+Usage:
     python src/plot_results.py
 """
 import sys
@@ -23,8 +16,7 @@ sys.path.insert(0, "src")
 from backtest_engine import run_backtest  # noqa: E402
 
 INITIAL_CAPITAL = 1_00_00_000
-FINAL_CONFIG = dict(mom_weight=0.5, weighting="invvol", weight_cap=0.15, reentry=True, quality_weight=0.5,
-                     redeploy_leftover=True)
+FINAL_CONFIG = dict(mom_weight=0.5, weight_cap=0.15, quality_weight=0.5, redeploy_leftover=True)
 
 
 def plot_equity_curve(eq, bench):

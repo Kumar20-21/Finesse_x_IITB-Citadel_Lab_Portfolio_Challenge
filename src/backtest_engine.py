@@ -1,12 +1,6 @@
 """
-Core backtest engine: stock selection, position sizing, rebalancing, and the daily
-trend-filter risk overlay described in the report's Methodology section.
-
-The final submitted strategy uses one fixed configuration of this engine (see
-run_backtest.py). The extra parameters below (mom_ensemble, downside_vol, dd_breaker,
-sector_cap, regime_bench) exist because the validation scripts in validation/ use this
-same engine to reproduce the alternative designs that were tested and rejected during
-development (see the report's Methodology / Limitations sections for why).
+Backtest engine: composite factor scoring, inverse-volatility weighting with a cap, and
+quarterly rebalancing with leftover-cash redeployment.
 """
 import pandas as pd
 import numpy as np
@@ -17,120 +11,53 @@ N_HOLDINGS = 10
 MOM_LOOKBACK = 252
 MOM_SKIP = 21
 VOL_LOOKBACK = 90
-TREND_WINDOW = 200
 
 
-MOM_ENSEMBLE_LOOKBACKS = [63, 126, 252]  # 3M / 6M / 12M, each skipping the most recent month
-
-
-ADV_LOOKBACK = 20
-
-
-def composite_scores(close, as_of_date, mom_weight, mom_ensemble=False,
-                      quality_weight=0.0, downside_vol=False,
-                      volume=None, min_adv_pctile=None):
+def composite_scores(close, as_of_date, mom_weight, quality_weight):
     """
-    volume, min_adv_pctile: optional liquidity screen. If both given, stocks whose trailing
-      20-day average daily traded value (price x volume) falls below the min_adv_pctile
-      percentile of that day's eligible universe are excluded before scoring, so illiquid
-      names with stale-price (artificially low) measured volatility can't be favoured by the
-      Low-Vol factor or over-sized by inverse-vol weighting.
+    Computes the composite factor score (Momentum, Low-Vol, Quality) for every eligible
+    stock as of as_of_date. Returns (scores sorted descending, trailing volatility).
     """
     idx_loc = close.index.get_loc(as_of_date)
     if idx_loc < MOM_LOOKBACK:
         return pd.Series(dtype=float), pd.Series(dtype=float)
     px = close.iloc[:idx_loc + 1]
 
-    if mom_ensemble:
-        z_list = []
-        for lb in MOM_ENSEMBLE_LOOKBACKS:
-            p_skip_ = px.iloc[-1 - MOM_SKIP]
-            p_lb_ = px.iloc[-1 - lb]
-            m = (p_skip_ / p_lb_) - 1.0
-            z_list.append((m - m.mean()) / m.std())
-        z_mom = pd.concat(z_list, axis=1).mean(axis=1)
-        mom_valid_mask = px.iloc[-MOM_LOOKBACK:].notna().sum() >= MOM_LOOKBACK * 0.95
-    else:
-        p_skip = px.iloc[-1 - MOM_SKIP]
-        p_lb = px.iloc[-1 - MOM_LOOKBACK]
-        mom = (p_skip / p_lb) - 1.0
-        z_mom = (mom - mom.mean()) / mom.std()
-        mom_valid_mask = px.iloc[-MOM_LOOKBACK:].notna().sum() >= MOM_LOOKBACK * 0.95
+    p_skip = px.iloc[-1 - MOM_SKIP]
+    p_lb = px.iloc[-1 - MOM_LOOKBACK]
+    mom = (p_skip / p_lb) - 1.0
+    z_mom = (mom - mom.mean()) / mom.std()
+    mom_valid_mask = px.iloc[-MOM_LOOKBACK:].notna().sum() >= MOM_LOOKBACK * 0.95
 
-    rets_full = px.pct_change().iloc[-VOL_LOOKBACK:]
-    if downside_vol:
-        # semi-deviation: only downside days count as "risk", so crash-prone names get
-        # penalised more than a symmetric-vol measure would penalise a smooth grinder.
-        vol = np.sqrt((rets_full.clip(upper=0) ** 2).mean())
-    else:
-        vol = rets_full.std()
+    vol = px.pct_change().iloc[-VOL_LOOKBACK:].std()
     lowvol = -vol
 
     valid = z_mom.notna() & lowvol.notna() & mom_valid_mask
 
-    if volume is not None and min_adv_pctile is not None:
-        vol_px = volume.iloc[:idx_loc + 1]
-        adv = (px.iloc[-ADV_LOOKBACK:] * vol_px.iloc[-ADV_LOOKBACK:]).mean()
-        liquid = adv >= adv[valid].quantile(min_adv_pctile)
-        valid = valid & liquid.reindex(valid.index).fillna(False)
-
-    if quality_weight > 0:
-        window = px.iloc[-MOM_LOOKBACK:]
-        log_px = np.log(window)
-        x_series = pd.Series(np.arange(len(window)), index=window.index, dtype=float)
-        r = log_px.corrwith(x_series)
-        z_quality = (r**2 - (r**2).mean()) / (r**2).std()
-        valid = valid & z_quality.notna()
-    else:
-        z_quality = None
+    window = px.iloc[-MOM_LOOKBACK:]
+    log_px = np.log(window)
+    x_series = pd.Series(np.arange(len(window)), index=window.index, dtype=float)
+    r = log_px.corrwith(x_series)
+    z_quality = (r**2 - (r**2).mean()) / (r**2).std()
+    valid = valid & z_quality.notna()
 
     z_mom = z_mom[valid]
     lowvol = lowvol[valid]
     vol = vol[valid]
     z_lv = (lowvol - lowvol.mean()) / lowvol.std()
+    z_quality = z_quality[valid]
 
-    if quality_weight > 0:
-        z_quality = z_quality[valid]
-        composite = ((1 - quality_weight) * (mom_weight * z_mom + (1 - mom_weight) * z_lv)
-                      + quality_weight * z_quality)
-    else:
-        composite = mom_weight * z_mom + (1 - mom_weight) * z_lv
+    composite = ((1 - quality_weight) * (mom_weight * z_mom + (1 - mom_weight) * z_lv)
+                 + quality_weight * z_quality)
 
     return composite.sort_values(ascending=False), vol
 
 
-def select_top_n_with_sector_cap(scores, industry_map, n, sector_cap=None):
-    if sector_cap is None:
-        return list(scores.index[:n])
-    picked, counts = [], {}
-    for t in scores.index:
-        ind = industry_map.get(t, "Unknown")
-        if counts.get(ind, 0) >= sector_cap:
-            continue
-        picked.append(t)
-        counts[ind] = counts.get(ind, 0) + 1
-        if len(picked) == n:
-            break
-    if len(picked) < n:  # relax cap only if universe can't fill 10 slots otherwise
-        for t in scores.index:
-            if t not in picked:
-                picked.append(t)
-                if len(picked) == n:
-                    break
-    return picked
-
-
 def capped_weights(raw_affinity, cap, eps=0.1):
+    """Inverse-volatility weights: shift affinities positive, normalise, then iteratively
+    cap at `cap`, redistributing excess proportionally to uncapped names."""
     shifted = raw_affinity - raw_affinity.min() + eps
     w = shifted / shifted.sum()
-    return cap_normalize(w, cap)
-
-
-def cap_normalize(raw_weights, cap):
-    """Normalise already-positive weights to sum to 1 and iteratively cap, without the
-    shift-by-minimum step in capped_weights() (which is specific to inverse-vol affinities and
-    would distort an already-meaningful weight scale such as softmax/FTRL weights)."""
-    w = raw_weights / raw_weights.sum()
     for _ in range(10):
         over = w > cap
         if not over.any():
@@ -144,79 +71,23 @@ def cap_normalize(raw_weights, cap):
     return w
 
 
-def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal",
-                  weight_cap=0.20, reentry=False, initial_capital=INITIAL_CAPITAL,
-                  dd_breaker=None, dd_breaker_frac=0.5, mom_ensemble=False,
-                  sector_cap=None, industry_map=None, quality_weight=0.0,
-                  downside_vol=False, regime_bench=None, regime_defensive_frac=0.5,
-                  volume=None, min_adv_pctile=None, invvol_eps=0.1, cash_buffer=0.0,
-                  redeploy_leftover=False, redeploy_cap=None, n_holdings=N_HOLDINGS,
-                  trend_buffer=0.0, use_trend_filter=True, trend_check_every=1,
-                  ftrl_eta=1.0, ftrl_decay=1.0, staged_buffer=None, staged_split=0.5):
+def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weight_cap=0.15, quality_weight=0.5,
+                  redeploy_leftover=True, redeploy_cap=None, initial_capital=INITIAL_CAPITAL,
+                  n_holdings=N_HOLDINGS, invvol_eps=0.1, dd_breaker=None, dd_breaker_frac=0.5):
     """
-    weighting: "equal" | "score" | "invvol" | "ftrl"
-    reentry: allow mid-quarter re-entry once price reclaims its 200-DMA
-    dd_breaker: if set (e.g. 0.08), de-risk dd_breaker_frac of every holding, once per
-      quarter, the first time portfolio value falls dd_breaker fraction below its
-      post-rebalance peak for that quarter.
-    mom_ensemble: average z-scored 3M/6M/12M momentum instead of a single 12-1M lookback.
-    sector_cap: max stocks per industry among the top-10 (requires industry_map: ticker -> industry).
-    quality_weight: blend in a trend-smoothness (R-squared of log-price trend) factor, to avoid
-      picking spiky/parabolic movers that are more prone to sharp reversal.
-    downside_vol: use downside semi-deviation instead of full std for the low-vol factor and
-      inverse-vol sizing, so crash risk is penalised more directly than symmetric volatility.
-    regime_bench: optional benchmark close-price Series; if given, at each rebalance the target
-      allocation is scaled by regime_defensive_frac whenever the benchmark itself is below its
-      own 200-DMA (a market-level, not stock-level, risk-off overlay).
-    volume, min_adv_pctile: optional liquidity screen, see composite_scores().
-    cash_buffer: fraction of portfolio value deliberately left as cash at every rebalance
-      (target weights are scaled by (1 - cash_buffer) before being converted to rupee
-      allocations), so funding all N_HOLDINGS positions never structurally exceeds available
-      cash once the 0.1% transaction cost on each buy is accounted for.
-    redeploy_leftover: if True, any cash left over after the main buy pass (e.g. because a
-      lower-priority name went unfunded) is topped up into the names that WERE funded that
-      quarter, proportional to their own target weights -- i.e. a more concentrated bet on the
-      names already selected, rather than forcing money into the unfunded name or leaving it
-      idle as cash.
-    redeploy_cap: weight_cap applies only to the initial 10-name selection/sizing pass. This
-      separately controls the redeployment pass: None (default, when redeploy_leftover=True)
-      allows redeployment to push a name's weight past weight_cap -- the cap governs which
-      names get selected and how the fund is initially sized, not how leftover cash from an
-      already-capped selection is used. Pass a number (e.g. weight_cap) to re-enforce a cap on
-      the redeployment pass too.
-    n_holdings: number of names selected each quarter (default N_HOLDINGS=10, the submitted
-      strategy's basket size).
-    trend_buffer: exit only triggers when price closes more than this fraction below the
-      moving average (default 0.0 = exit on any close below, the submitted behaviour);
-      re-entry requires price to be back above average * (1 - trend_buffer). A buffer adds
-      hysteresis around the average to reduce whipsaw exits on stocks oscillating near it.
-    use_trend_filter: if False, the daily 200-DMA exit/re-entry check never runs at all --
-      positions only change at quarterly rebalances (default True, the submitted behaviour).
-    trend_check_every: check the trend filter every this many trading days instead of every
-      single day (default 1 = daily, the submitted behaviour). E.g. 5 checks about weekly.
-    ftrl_eta, ftrl_decay: only used when weighting="ftrl". Follow-the-Regularized-Leader with an
-      entropic regularizer reduces to the Hedge / multiplicative-weights update: weight on a
-      name is proportional to exp(ftrl_eta * cumulative composite score). Each rebalance, a
-      selected name's running score is cum = ftrl_decay * cum_prev + composite_score (decay=1.0
-      is the textbook infinite-memory FTRL; decay<1 discounts older quarters so the allocation
-      can adapt to regime change). Weights are then cap_normalize()-d at weight_cap, same as
-      every other weighting scheme.
-    staged_buffer: if set (e.g. 0.08), replaces the binary trend_buffer/use_trend_filter exit
-      rule with a staged one for every name in that quarter's target_list: exposure is 0% while
-      price is more than staged_buffer below its 200-DMA, staged_split (e.g. 50%) while price is
-      within +/-staged_buffer of the average, and 100% once price is more than staged_buffer
-      above it. Checked at the same trend_check_every cadence. A name scaling in or out moves
-      toward the zone's target size rather than jumping straight to fully in or fully out, so a
-      quick reversal only ever costs the cost of the partial trade, not the full one.
-    staged_split: the fractional exposure held in the middle zone when staged_buffer is set
-      (default 0.5, i.e. half in/half out); ignored otherwise.
+    Runs the quarterly-rebalanced backtest from start to end and returns
+    (equity_curve, trade_log, closed_trades). A selected stock already trading below its own
+    200-day average on the rebalance date itself is not bought that quarter.
+
+    redeploy_cap: caps each name's weight during the leftover-cash redeployment pass (None =
+    uncapped, the submitted behaviour; weight_cap re-enforces the initial-selection cap instead).
+    dd_breaker, dd_breaker_frac: if dd_breaker is set (e.g. 0.08), sells dd_breaker_frac of every
+    holding, once per quarter, the first time portfolio value falls dd_breaker below its
+    post-rebalance peak for that quarter. None (default) disables this, the submitted behaviour.
     """
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
-    trading_days = close.index
-    sim_days = trading_days[(trading_days >= start) & (trading_days <= end)]
-
-    regime_sma = regime_bench.rolling(200, min_periods=200).mean() if regime_bench is not None else None
+    sim_days = close.index[(close.index >= start) & (close.index <= end)]
 
     q_starts = pd.date_range(start.replace(month=1, day=1), end, freq='QS')
     rebal_dates = []
@@ -224,26 +95,14 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
         future = sim_days[sim_days >= max(qs, start)]
         if len(future) > 0:
             rebal_dates.append(future[0])
-    rebal_set = set(sorted(set(rebal_dates)))
+    rebal_set = set(rebal_dates)
 
     cash = initial_capital
     shares = pd.Series(0.0, index=close.columns)
     avg_entry = pd.Series(np.nan, index=close.columns)
     current_target_list = set()
-    target_alloc = {}
-    staged_base_alloc = {}
-    exited_pending_reentry = set()
     quarter_peak = initial_capital
     breaker_triggered = False
-    ftrl_cumscore = {}
-    staged_zone = {}
-
-    def staged_fraction(p, s):
-        if p >= s * (1 + staged_buffer):
-            return 1.0
-        if p >= s * (1 - staged_buffer):
-            return staged_split
-        return 0.0
 
     equity_curve, trade_log, closed_trades = [], [], []
 
@@ -273,247 +132,124 @@ def run_backtest(close, sma200, start, end, *, mom_weight=0.5, weighting="equal"
         trade_log.append({'Date': date, 'Ticker': ticker, 'Side': side,
                            'Shares': n_shares, 'Price': price, 'Notional': notional, 'Cost': cost})
 
-    for day_idx, date in enumerate(sim_days):
+    for date in sim_days:
         px_today = close.loc[date]
-
-        if date in rebal_set:
-            scores, vol = composite_scores(close, date, mom_weight, mom_ensemble=mom_ensemble,
-                                            quality_weight=quality_weight, downside_vol=downside_vol,
-                                            volume=volume, min_adv_pctile=min_adv_pctile)
-            target_list = select_top_n_with_sector_cap(scores, industry_map or {}, n_holdings, sector_cap=sector_cap)
-            current_target_list = set(target_list)
-            exited_pending_reentry = set()
-
+        if date not in rebal_set:
             port_val = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
+            quarter_peak = max(quarter_peak, port_val)
+            if dd_breaker is not None and not breaker_triggered and shares.gt(0).any():
+                if port_val < quarter_peak * (1 - dd_breaker):
+                    for t in [tt for tt in shares.index if shares[tt] > 0]:
+                        p = px_today.get(t, np.nan)
+                        if pd.isna(p):
+                            continue
+                        n = np.floor(shares[t] * dd_breaker_frac)
+                        if n >= 1:
+                            execute(t, date, 'SELL', n, p)
+                    breaker_triggered = True
+                    port_val = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
+            equity_curve.append({'Date': date, 'PortfolioValue': port_val, 'Cash': cash})
+            continue
 
-            if weighting == "equal":
-                w = pd.Series(1.0 / n_holdings, index=target_list)
-            elif weighting == "score":
-                w = capped_weights(scores.loc[target_list], cap=weight_cap)
-            elif weighting == "invvol":
-                inv = 1.0 / vol.loc[target_list]
-                w = capped_weights(inv, cap=weight_cap, eps=invvol_eps)
-            elif weighting == "ftrl":
-                # Follow-the-Regularized-Leader with an entropic regularizer: weight on a name
-                # is proportional to exp(eta * cumulative score). Names outside target_list keep
-                # whatever cumulative score they last had (frozen, not reset), so a name that
-                # drops out and later re-enters resumes from its prior history rather than
-                # starting cold.
-                for t in target_list:
-                    ftrl_cumscore[t] = ftrl_decay * ftrl_cumscore.get(t, 0.0) + scores[t]
-                raw = pd.Series({t: np.exp(ftrl_eta * ftrl_cumscore[t]) for t in target_list})
-                w = cap_normalize(raw, weight_cap)
-            else:
-                raise ValueError(weighting)
+        scores, vol = composite_scores(close, date, mom_weight, quality_weight)
+        target_list = list(scores.index[:n_holdings])
+        current_target_list = set(target_list)
 
-            exposure_scale = 1.0
-            if regime_sma is not None and date in regime_bench.index and pd.notna(regime_sma.get(date, np.nan)):
-                if regime_bench[date] < regime_sma[date]:
-                    exposure_scale = regime_defensive_frac
+        port_val = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
+        inv = 1.0 / vol.loc[target_list]
+        w = capped_weights(inv, cap=weight_cap, eps=invvol_eps)
+        target_alloc = {t: w[t] * port_val for t in target_list}
 
-            target_alloc = {t: w[t] * port_val * exposure_scale * (1 - cash_buffer) for t in target_list}
-            staged_base_alloc = dict(target_alloc)
+        for t in target_list:
+            p_t = px_today.get(t, np.nan)
+            s_t = sma200.loc[date, t] if t in sma200.columns else np.nan
+            if pd.notna(p_t) and pd.notna(s_t) and p_t < s_t:
+                target_alloc[t] = 0.0
 
-            if staged_buffer is not None:
-                # Staged entry/exit: scale this quarter's target by the price-vs-trend zone
-                # (0%, staged_split, or 100%) right away, so a name entering mid-buffer starts
-                # at partial size instead of buying full then immediately trimming back.
-                for t in target_list:
-                    p_t = px_today.get(t, np.nan)
-                    s_t = sma200.loc[date, t] if t in sma200.columns else np.nan
-                    if pd.notna(p_t) and pd.notna(s_t):
-                        frac = staged_fraction(p_t, s_t)
-                        target_alloc[t] *= frac
-                        staged_zone[t] = frac
-            else:
-                # A stock can score well on momentum/low-vol/quality while already trading below
-                # its own trend filter that same day -- selection doesn't check trend status. Buying
-                # it here would just be sold again by the same-day trend-filter check below, at the
-                # same closing price, for a guaranteed pure transaction-cost loss with zero chance of
-                # benefit (identical buy/sell price, same day). Zero its allocation instead, so any
-                # existing position is sold down normally and (if reentry is on) it re-enters via the
-                # standard mid-quarter mechanism once price actually reclaims the average.
-                for t in target_list:
-                    p_t = px_today.get(t, np.nan)
-                    s_t = sma200.loc[date, t] if t in sma200.columns else np.nan
-                    if pd.notna(p_t) and pd.notna(s_t) and p_t < s_t * (1 - trend_buffer):
-                        target_alloc[t] = 0.0
-                        if reentry:
-                            exited_pending_reentry.add(t)
+        drop = [t for t in shares.index if shares[t] > 0 and t not in current_target_list]
+        for t in drop:
+            p = px_today.get(t, np.nan)
+            if pd.isna(p) or shares[t] <= 0:
+                continue
+            execute(t, date, 'SELL', shares[t], p)
 
-            drop = [t for t in shares.index if shares[t] > 0 and t not in current_target_list]
-            for t in drop:
-                p = px_today.get(t, np.nan)
-                if pd.isna(p) or shares[t] <= 0:
-                    continue
-                execute(t, date, 'SELL', shares[t], p)
+        # Simulate the main trim/buy pass and the leftover-cash redeployment pass against a
+        # local cash/share balance first, accumulating one signed net delta per name, so each
+        # name executes as exactly one order.
+        net_delta = {}
+        sim_cash = cash
+        sim_shares = {t: shares[t] for t in target_list}
+        trimmed = set()
+        for t in target_list:
+            p = px_today.get(t, np.nan)
+            if pd.isna(p) or p <= 0:
+                continue
+            diff_val = target_alloc[t] - shares[t] * p
+            if diff_val < 0:
+                n = np.floor(min(shares[t], -diff_val / p))
+                if n >= 1:
+                    net_delta[t] = net_delta.get(t, 0) - n
+                    sim_shares[t] -= n
+                    sim_cash += n * p * (1 - TXN_COST)
+                trimmed.add(t)
+            elif diff_val > 0:
+                n = np.floor(diff_val / p)
+                if n >= 1 and n * p * (1 + TXN_COST) <= sim_cash:
+                    net_delta[t] = net_delta.get(t, 0) + n
+                    sim_shares[t] += n
+                    sim_cash -= n * p * (1 + TXN_COST)
 
-            # Every stage below (initial trim/buy, then the leftover-cash redeployment top-up)
-            # is worked out against a simulated cash/share balance first, accumulating a single
-            # signed net share delta per name. Only once every stage has been decided is each
-            # name's final delta executed as exactly one order -- never a separate order per
-            # stage, and never an offsetting sell-then-buy (or buy-then-sell) pair on the same
-            # name at the same price, which would just pay two lots of transaction cost for a
-            # net position that a single trade could reach directly.
-            net_delta = {}
-            sim_cash = cash
-            sim_shares = {t: shares[t] for t in target_list}
-            trimmed = set()
-            for t in target_list:
-                p = px_today.get(t, np.nan)
-                if pd.isna(p) or p <= 0:
-                    continue
-                diff_val = target_alloc[t] - shares[t] * p
-                if diff_val < 0:
-                    n = np.floor(min(shares[t], -diff_val / p))
-                    if n >= 1:
-                        net_delta[t] = net_delta.get(t, 0) - n
-                        sim_shares[t] -= n
-                        sim_cash += n * p * (1 - TXN_COST)
-                    trimmed.add(t)
-                elif diff_val > 0:
-                    n = np.floor(diff_val / p)
+        if redeploy_leftover:
+            # Top up names that got funded (excluding ones trimmed this quarter), proportional
+            # to their own target weights, with cash left after the main pass.
+            for _ in range(5):
+                funded = [t for t in target_list if t not in trimmed and sim_shares.get(t, 0) > 0]
+                if not funded or sim_cash <= 0:
+                    break
+                if redeploy_cap is not None:
+                    port_val_now = sim_cash + sum(sim_shares[t] * px_today.get(t, np.nan) for t in funded)
+                    cur_val = pd.Series({t: sim_shares[t] * px_today.get(t, np.nan) for t in funded})
+                    headroom = (redeploy_cap * port_val_now - cur_val).clip(lower=0)
+                    headroom = headroom[headroom > 0]
+                    if headroom.empty:
+                        break
+                    room_names = headroom.index
+                else:
+                    headroom = None
+                    room_names = funded
+                w_room = w.loc[room_names]
+                w_room = w_room / w_room.sum()
+                bought_any = False
+                for t in room_names:
+                    p = px_today.get(t, np.nan)
+                    if pd.isna(p) or p <= 0:
+                        continue
+                    extra_cash = w_room[t] * sim_cash
+                    if headroom is not None:
+                        extra_cash = min(extra_cash, headroom[t])
+                    n = np.floor(extra_cash / p)
                     if n >= 1 and n * p * (1 + TXN_COST) <= sim_cash:
                         net_delta[t] = net_delta.get(t, 0) + n
                         sim_shares[t] += n
                         sim_cash -= n * p * (1 + TXN_COST)
+                        bought_any = True
+                if not bought_any:
+                    break
 
-            if redeploy_leftover:
-                # Top up the names that DID get funded, proportional to their own target
-                # weights, using whatever cash is left after the main pass -- a more
-                # concentrated bet on the already-selected names, instead of leaving the
-                # shortfall idle or forcing it into the unfunded (typically riskiest) name.
-                # weight_cap governed the initial selection/sizing pass above; redeploy_cap
-                # (None by default) separately controls whether this top-up pass is capped.
-                # Names being trimmed down this quarter are excluded even though they still
-                # hold shares > 0: this quarter's score already says they deserve less capital,
-                # so redeploying someone else's leftover cash back into a name just trimmed
-                # would contradict the rebalancing signal that trimmed it (confirmed empirically
-                # worse on every headline metric than excluding them, not just costlier to trade).
-                for _ in range(5):
-                    funded = [t for t in target_list if t not in trimmed and sim_shares.get(t, 0) > 0]
-                    if not funded or sim_cash <= 0:
-                        break
-                    if redeploy_cap is not None:
-                        port_val_now = sim_cash + sum(sim_shares[t] * px_today.get(t, np.nan) for t in funded)
-                        cur_val = pd.Series({t: sim_shares[t] * px_today.get(t, np.nan) for t in funded})
-                        headroom = (redeploy_cap * port_val_now - cur_val).clip(lower=0)
-                        headroom = headroom[headroom > 0]
-                        if headroom.empty:
-                            break
-                        room_names = headroom.index
-                    else:
-                        headroom = None
-                        room_names = funded
-                    w_room = w.loc[room_names]
-                    w_room = w_room / w_room.sum()
-                    bought_any = False
-                    for t in room_names:
-                        p = px_today.get(t, np.nan)
-                        if pd.isna(p) or p <= 0:
-                            continue
-                        extra_cash = w_room[t] * sim_cash
-                        if headroom is not None:
-                            extra_cash = min(extra_cash, headroom[t])
-                        n = np.floor(extra_cash / p)
-                        if n >= 1 and n * p * (1 + TXN_COST) <= sim_cash:
-                            net_delta[t] = net_delta.get(t, 0) + n
-                            sim_shares[t] += n
-                            sim_cash -= n * p * (1 + TXN_COST)
-                            bought_any = True
-                    if not bought_any:
-                        break
-
-            for t, n in net_delta.items():
-                if n < 0:
-                    p = px_today.get(t, np.nan)
-                    if pd.notna(p) and p > 0:
-                        execute(t, date, 'SELL', -n, p)
-            for t, n in net_delta.items():
-                if n > 0:
-                    p = px_today.get(t, np.nan)
-                    if pd.notna(p) and p > 0 and n * p <= cash:
-                        execute(t, date, 'BUY', n, p)
-
-            quarter_peak = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
-            breaker_triggered = False
-
-        if staged_buffer is None and use_trend_filter and day_idx % trend_check_every == 0:
-            held = [t for t in shares.index if shares[t] > 0]
-            for t in held:
+        for t, n in net_delta.items():
+            if n < 0:
                 p = px_today.get(t, np.nan)
-                s = sma200.loc[date, t] if t in sma200.columns else np.nan
-                if pd.isna(p) or pd.isna(s):
-                    continue
-                if p < s * (1 - trend_buffer):
-                    execute(t, date, 'SELL', shares[t], p)
-                    if reentry and t in current_target_list:
-                        exited_pending_reentry.add(t)
-
-        if staged_buffer is None and use_trend_filter and day_idx % trend_check_every == 0 and reentry:
-            # Deterministic order: iterating a Python set directly is hash-seed dependent
-            # (varies across process runs), which silently made cash-constrained re-entry
-            # ties non-reproducible. Sort by target allocation (highest-conviction first)
-            # so any cash-limited tie-break is both deterministic and economically motivated.
-            reentry_order = sorted(exited_pending_reentry, key=lambda t: -target_alloc.get(t, 0))
-            for t in reentry_order:
-                if shares[t] > 0:
-                    exited_pending_reentry.discard(t)
-                    continue
+                if pd.notna(p) and p > 0:
+                    execute(t, date, 'SELL', -n, p)
+        for t, n in net_delta.items():
+            if n > 0:
                 p = px_today.get(t, np.nan)
-                s = sma200.loc[date, t] if t in sma200.columns else np.nan
-                if pd.isna(p) or pd.isna(s):
-                    continue
-                if p >= s * (1 - trend_buffer):
-                    alloc = target_alloc.get(t, 0)
-                    n = np.floor(alloc / p)
-                    if n >= 1 and n * p <= cash:
-                        execute(t, date, 'BUY', n, p)
-                    exited_pending_reentry.discard(t)
-
-        if staged_buffer is not None and use_trend_filter and day_idx % trend_check_every == 0:
-            # Move a currently-selected name toward its zone-appropriate exposure (0%,
-            # staged_split, or 100% of its full, un-scaled quarterly target) only when the zone
-            # itself actually changes -- not every day the price merely drifts within the same
-            # zone, which would otherwise force a tiny re-round-to-whole-shares trade daily
-            # purely from price noise, with no zone crossing involved at all.
-            deltas = {}
-            for t in current_target_list:
-                p = px_today.get(t, np.nan)
-                s = sma200.loc[date, t] if t in sma200.columns else np.nan
-                base = staged_base_alloc.get(t, 0)
-                if pd.isna(p) or pd.isna(s) or p <= 0 or base <= 0:
-                    continue
-                new_frac = staged_fraction(p, s)
-                if new_frac == staged_zone.get(t):
-                    continue
-                staged_zone[t] = new_frac
-                desired = np.floor(new_frac * base / p)
-                delta = desired - shares.get(t, 0)
-                if abs(delta) >= 1:
-                    deltas[t] = (delta, p)
-            for t, (delta, p) in deltas.items():
-                if delta < 0:
-                    execute(t, date, 'SELL', min(shares[t], -delta), p)
-            for t, (delta, p) in deltas.items():
-                if delta > 0 and delta * p <= cash:
-                    execute(t, date, 'BUY', delta, p)
+                if pd.notna(p) and p > 0 and n * p <= cash:
+                    execute(t, date, 'BUY', n, p)
 
         port_val = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
-        quarter_peak = max(quarter_peak, port_val)
-
-        if dd_breaker is not None and not breaker_triggered and shares.gt(0).any():
-            if port_val < quarter_peak * (1 - dd_breaker):
-                for t in [tt for tt in shares.index if shares[tt] > 0]:
-                    p = px_today.get(t, np.nan)
-                    if pd.isna(p):
-                        continue
-                    n = np.floor(shares[t] * dd_breaker_frac)
-                    if n >= 1:
-                        execute(t, date, 'SELL', n, p)
-                breaker_triggered = True
-                port_val = cash + (shares * px_today.reindex(shares.index).fillna(0)).sum()
-
+        quarter_peak = port_val
+        breaker_triggered = False
         equity_curve.append({'Date': date, 'PortfolioValue': port_val, 'Cash': cash})
 
     eq = pd.DataFrame(equity_curve).set_index('Date')

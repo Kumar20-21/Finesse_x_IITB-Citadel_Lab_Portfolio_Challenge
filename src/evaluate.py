@@ -1,8 +1,6 @@
 """
-Compute every metric required by the Round 2 guidelines (absolute/total return, annualised
-return, MDD, Sharpe, Gain-to-Loss, Accuracy, trade statistics) plus the benchmark comparison,
-for the results produced by run_backtest.py. Also reports a handful of standard portfolio-
-manager metrics (Alpha, Beta, Information Ratio, Sortino, Calmar) for additional context.
+Computes required performance/risk/trade metrics and benchmark comparison from the results
+of run_backtest.py, plus Alpha/Beta/Information Ratio/Sortino/Calmar.
 
 Usage:
     python src/evaluate.py

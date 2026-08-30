@@ -4,21 +4,18 @@
 
 A systematic, rules-based 10-stock equity portfolio strategy over the Nifty 100 / Midcap 100 /
 Smallcap 100 universe, backtested 1 Jan 2021 – 31 Dec 2025. See `report/report.pdf` for the full
-5-6 page writeup (problem, methodology, results, benchmark comparison, limitations). This README
-covers only how to reproduce the code.
+writeup (problem, methodology, results, benchmark comparison, limitations). This README covers
+how to reproduce the code.
 
 ## Strategy summary
 
 Every quarter, a composite score combining three price-based factors — 12-1 month momentum,
 low-volatility, and a trend-quality factor (R² of the price trend) — is computed for all ~300
 eligible stocks. The 10 highest-scoring stocks are selected and sized inverse-volatility, capped
-at 15% per name for this initial selection pass; any leftover cash (typically because the
-lowest-priority name is structurally underfunded once transaction costs are added) is redeployed
-into the names that were funded, which can push a name above 15%. Between rebalances, a 200-day
-moving average trend filter can exit (and re-enter) any individual position on any trading day. A
-0.1% transaction cost applies to every buy and sell. Full rationale for each design choice,
-including three tested-and-rejected alternatives to the redeployment rule, is in
-`report/report.pdf`.
+at 15% per name for this initial selection pass; any leftover cash is redeployed into the names
+that were funded, which can push a name above 15%. A stock already trading below its own 200-day
+average on the rebalance date itself is not bought that quarter. A 0.1% transaction cost applies
+to every buy and sell. Full rationale is in `report/report.pdf`.
 
 ## Repository structure
 
@@ -26,15 +23,18 @@ including three tested-and-rejected alternatives to the redeployment rule, is in
 src/
   build_universe.py      Build the 300-stock universe from the raw NSE index lists
   download_data.py       Download daily prices (yfinance) for the universe + benchmarks
-  backtest_engine.py     Core engine: scoring, selection, weighting, rebalancing, trend filter
-  run_backtest.py        Run the official submitted strategy, 2021-2025
+  backtest_engine.py     Core engine: scoring, selection, weighting, rebalancing
+  run_backtest.py        Run the submitted strategy, 2021-2025
   evaluate.py            Compute all required metrics + benchmark comparison
   plot_results.py        Generate every report figure (equity curve, drawdown, quarterly excess)
 
 validation/
-  train_test_validation.py    Lock rules on 2021-2024, test blind on 2025 (no re-tuning)
+  train_test_validation.py    Train 2021-2024, blind test on 2025
   quarterly_robustness.py     20-quarter rolling-window robustness check
   quality_weight_search.py    Parameter search for the quality-factor weight
+  redeploy_comparison.py      Compares the redeployment rule against two alternatives
+  momentum_crash_check.py     Two-factor vs. three-factor blind 2025 comparison
+  drawdown_breaker_check.py   Tests a drawdown circuit breaker (rejected)
 
 data/
   raw_index_lists/       Raw NSE constituent CSVs for the three indices
@@ -57,9 +57,9 @@ pip install -r requirements.txt
 
 ## Reproducing the results
 
-The `data/` and `results/` folders already contain the exact snapshot used for the submission
-(prices as pulled during development, and the resulting backtest output), so `evaluate.py` can
-be run immediately without re-downloading anything. To regenerate everything from scratch:
+The `data/` and `results/` folders already contain the exact snapshot used for the submission,
+so `evaluate.py` can be run immediately without re-downloading anything. To regenerate everything
+from scratch:
 
 ```bash
 cd portfolio-strategy   # run all commands from the repo root
@@ -71,9 +71,9 @@ python3 src/plot_results.py       # -> report/equity_curve.pdf, drawdown.pdf, qu
 ```
 
 Note: re-running `download_data.py` pulls current data from Yahoo Finance, which can differ
-slightly from the original snapshot (adjusted-close series are retroactively updated for any
-corporate actions that occur after the original download). The committed `data/*.pkl` files are
-the exact data the submitted results were produced from.
+slightly from the original snapshot (adjusted-close series are retroactively updated for
+corporate actions after the original download). The committed `data/*.pkl` files are the exact
+data the submitted results were produced from.
 
 ### Validation / robustness checks
 
@@ -81,23 +81,15 @@ the exact data the submitted results were produced from.
 python3 validation/train_test_validation.py
 python3 validation/quarterly_robustness.py
 python3 validation/quality_weight_search.py
-python3 validation/liquidity_filter_search.py
-python3 validation/invvol_eps_search.py
-python3 validation/cash_buffer_search.py
-python3 validation/n_holdings_search.py
-python3 validation/weight_cap_search.py
 python3 validation/redeploy_comparison.py
+python3 validation/momentum_crash_check.py
+python3 validation/drawdown_breaker_check.py
 ```
 
-These reproduce the evidence discussed in the report's Methodology and Limitations sections:
-the train/2021-24-test/2025 split, the 20-quarter robustness grid (including why a tested
-drawdown-breaker variant was rejected), the parameter search confirming the quality-factor
-weight is a stable choice rather than an overfit one, and several tested-and-rejected
-alternatives to the submitted design (a liquidity/ADV screen, a larger inverse-vol shift
-constant, a deliberate cash buffer, fewer than 10 holdings, and a looser concentration cap) --
-each script's docstring explains what was tested and why it didn't make the cut. The one
-alternative that DID make the cut, redeploying leftover cash into already-selected names, is
-compared against the two alternatives it beat in `redeploy_comparison.py`.
+These reproduce the evidence cited in the report's Methodology and Limitations sections: the
+train/2025-holdout split, the 20-quarter robustness grid, the grid search confirming the
+quality-factor weight sits in a stable region, the comparison behind the redeployment rule, the
+momentum-crash evidence for including the quality factor, and the rejected drawdown breaker.
 
 ## Data sources
 
@@ -111,12 +103,12 @@ compared against the two alternatives it beat in `redeploy_comparison.py`.
 
 | Metric | Value |
 |---|---|
-| Total Net PnL | Rs 7.14 crore |
-| Annualised Return (CAGR) | 52.14% |
-| Maximum Drawdown | -25.10% |
-| Sharpe Ratio (rf=0%) | 2.72 |
-| Gain-to-Loss Ratio | 2.40 |
-| Accuracy | 54.92% |
+| Total Net PnL | Rs 6.37 crore |
+| Annualised Return (CAGR) | 49.15% |
+| Maximum Drawdown | -30.07% |
+| Sharpe Ratio (rf=0%) | 2.35 |
+| Gain-to-Loss Ratio | 1.70 |
+| Accuracy | 61.62% |
 | Benchmark (Nifty 500) CAGR | 15.36% |
 
 Full metric list, methodology, and discussion of limitations are in `report/report.pdf`.
